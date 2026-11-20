@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { exercises, exerciseById } from '../exercises.js';
+import data from '../repdb-data.js';
 import { GENERATOR_KEYWORDS, generateSession, recommend, validateItem, exportSession, importSession, makeTimeline, locatePhase, formatTime } from '../core.js';
 
 test('catalogue RepDB complet et séances précédentes conservées', () => {
@@ -9,6 +10,13 @@ test('catalogue RepDB complet et séances précédentes conservées', () => {
   assert.ok(exercises.every(e => e.steps.length && e.images.length && e.images.every(url => url.startsWith('https://raw.githubusercontent.com/RepDB/exercise-dataset/f12da458a90f353a86c953f204304d5a8bd98275/images/flat/'))));
   assert.equal(exerciseById('0001').name, '3/4 sit-up');
   assert.equal(exerciseById('repdb:muscle-ups').name, 'Muscle Ups');
+});
+test('images du catalogue : positions de départ et de fin dans le bon ordre', () => {
+  for (const entry of data) {
+    const images = exerciseById(`repdb:${entry.id}`).images;
+    const expected = [...new Set([entry.images.start, entry.images.peak, entry.images.main].filter(Boolean))];
+    assert.deepEqual(images.map(url => new URL(url).pathname.split('/').slice(-2).join('/')), expected.map(path => path.replace('images/', '')));
+  }
 });
 test('chronologie : séries, repos intermédiaires et aucun repos final', () => {
   const items = [{exerciseId:'a',sets:2,work:10,rest:5},{exerciseId:'b',sets:1,work:20,rest:0}];
