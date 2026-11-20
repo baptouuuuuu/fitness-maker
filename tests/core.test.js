@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { exercises, exerciseById } from '../exercises.js';
-import { GENERATOR_KEYWORDS, generateSession, recommend, validateItem, makeTimeline, locatePhase, formatTime } from '../core.js';
+import { GENERATOR_KEYWORDS, generateSession, recommend, validateItem, exportSession, importSession, makeTimeline, locatePhase, formatTime } from '../core.js';
 
 test('catalogue RepDB complet et séances précédentes conservées', () => {
   assert.equal(exercises.length, 708);
@@ -13,6 +13,24 @@ test('catalogue RepDB complet et séances précédentes conservées', () => {
 test('chronologie : séries, repos intermédiaires et aucun repos final', () => {
   const items = [{exerciseId:'a',sets:2,work:10,rest:5},{exerciseId:'b',sets:1,work:20,rest:0}];
   assert.deepEqual(makeTimeline(items).map(p => [p.type,p.duration]), [['work',10],['rest',5],['work',10],['rest',5],['work',20]]);
+});
+test('chronologie distingue les occurrences répétées du même exercice', () => {
+  const items = [{exerciseId:'a',sets:2,work:10,rest:5},{exerciseId:'a',sets:1,work:20,rest:0}];
+  assert.deepEqual(makeTimeline(items).map(p => p.itemIndex), [0,0,0,0,1]);
+});
+test('export et import de séance conservent les paramètres sans identifiant local', () => {
+  const session = {id:'local',name:'Séance',items:[{exerciseId:'0001',sets:2,work:30,rest:10},{exerciseId:'repdb:muscle-ups',sets:1,work:45,rest:0}]};
+  const json = exportSession(session);
+  assert.deepEqual(importSession(json, exerciseById), {name:session.name,items:session.items});
+  assert.equal(JSON.parse(json).id, undefined);
+});
+test('import refuse les fichiers invalides et les exercices inconnus', () => {
+  const valid = JSON.parse(exportSession({name:'Séance',items:[{exerciseId:'0001',sets:1,work:30,rest:0}]}));
+  assert.throws(() => importSession('{', exerciseById), /JSON valide/);
+  assert.throws(() => importSession(JSON.stringify({...valid,version:2}), exerciseById), /non pris en charge/);
+  assert.throws(() => importSession(JSON.stringify({...valid,items:[]}), exerciseById), /invalide/);
+  assert.throws(() => importSession(JSON.stringify({...valid,items:[{...valid.items[0],work:4}]}), exerciseById), /invalide/);
+  assert.throws(() => importSession(JSON.stringify({...valid,items:[{...valid.items[0],exerciseId:'inconnu'}]}), exerciseById), /inconnus/);
 });
 test('chronomètre : limites de phase et dépassement après inactivité', () => {
   const timeline = makeTimeline([{exerciseId:'a',sets:2,work:10,rest:5}]);

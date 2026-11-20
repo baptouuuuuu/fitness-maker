@@ -66,12 +66,29 @@ export function validateItem(item) {
   return item && typeof item.exerciseId === 'string' && Number.isInteger(item.work) && item.work >= 5 && item.work <= 600 && Number.isInteger(item.rest) && item.rest >= 0 && item.rest <= 300 && Number.isInteger(item.sets) && item.sets >= 1 && item.sets <= 10;
 }
 
+export function exportSession(session) {
+  return JSON.stringify({format:'fitness-maker-session', version:1, name:session.name, items:session.items.map(({exerciseId, sets, work, rest}) => ({exerciseId, sets, work, rest}))}, null, 2);
+}
+
+export function importSession(text, exerciseById) {
+  let data;
+  try { data = JSON.parse(text); }
+  catch { throw new Error('Ce fichier ne contient pas de JSON valide.'); }
+  if (!data || typeof data !== 'object' || Array.isArray(data) || data.format !== 'fitness-maker-session' || data.version !== 1 ||
+      typeof data.name !== 'string' || !data.name.trim() || data.name.length > 80 ||
+      !Array.isArray(data.items) || !data.items.length || !data.items.every(validateItem)) {
+    throw new Error('Format de séance invalide ou non pris en charge.');
+  }
+  if (!data.items.every(item => exerciseById(item.exerciseId))) throw new Error('Cette séance contient des exercices inconnus dans ce catalogue.');
+  return {name:data.name.trim(), items:data.items.map(({exerciseId, sets, work, rest}) => ({exerciseId, sets, work, rest}))};
+}
+
 export function makeTimeline(items) {
   const timeline = [];
   items.forEach((item, index) => {
     for (let set = 1; set <= item.sets; set++) {
-      timeline.push({ type:'work', exerciseId:item.exerciseId, duration:item.work, set, sets:item.sets });
-      if (item.rest && (set < item.sets || index < items.length - 1)) timeline.push({ type:'rest', exerciseId:item.exerciseId, duration:item.rest, set, sets:item.sets });
+      timeline.push({ type:'work', exerciseId:item.exerciseId, itemIndex:index, duration:item.work, set, sets:item.sets });
+      if (item.rest && (set < item.sets || index < items.length - 1)) timeline.push({ type:'rest', exerciseId:item.exerciseId, itemIndex:index, duration:item.rest, set, sets:item.sets });
     }
   });
   return timeline;

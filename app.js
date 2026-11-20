@@ -1,5 +1,5 @@
 import { exercises, exerciseById } from './exercises.js';
-import { STORAGE_KEY, GENERATOR_KEYWORDS, generateSession, recommend, validateItem, makeTimeline, formatTime, locatePhase } from './core.js';
+import { STORAGE_KEY, GENERATOR_KEYWORDS, generateSession, recommend, validateItem, exportSession, importSession, makeTimeline, formatTime, locatePhase } from './core.js';
 import { getAnimation, saveAnimation, deleteAnimation } from './animations.js';
 
 const app = document.querySelector('#app');
@@ -72,6 +72,9 @@ function shell(content) {
 function options(values, selected) {
   return values.map(value => `<option ${value === selected ? 'selected' : ''}>${escapeHtml(value)}</option>`).join('');
 }
+function exerciseImage(exercise, className) {
+  return `<div class="exercise-image ${className}">${exercise.images?.[0] ? `<img src="${escapeHtml(exercise.images[0])}" alt="" loading="lazy">` : ''}<span>Image indisponible</span></div>`;
+}
 function card(exercise, rec) {
   const favorite = state.favorites.includes(exercise.id);
   return `<article class="exercise-card"><div class="card-art"><span class="level">${escapeHtml(exercise.equipmentDetail)}</span><button class="favorite ${favorite ? 'selected' : ''}" data-action="favorite" data-id="${exercise.id}" aria-label="${favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'} : ${escapeHtml(exercise.name)}" aria-pressed="${favorite}">${favorite ? '♥' : '♡'}</button><button class="art-button" data-action="detail" data-id="${exercise.id}" aria-label="Voir ${escapeHtml(exercise.name)}"><span class="art-symbol">✳</span><img class="card-image" src="${escapeHtml(exercise.images[0])}" alt="" loading="lazy"></button></div><div class="card-body"><div class="card-kicker">${exercise.category} <span>·</span> ${exercise.equipment}</div><h3>${escapeHtml(exercise.name)}</h3><div class="tags">${exercise.muscles.map(m => `<span>${escapeHtml(m)}</span>`).join('')}</div>${state.sort === 'relevance' ? `<p class="reason">✦ ${rec.reason}</p>` : ''}<div class="card-actions"><button class="text-button" data-action="detail" data-id="${exercise.id}">Voir l’exercice ↗</button><button class="add-button" data-action="add" data-id="${exercise.id}" aria-label="Ajouter ${escapeHtml(exercise.name)} à la séance">+</button></div></div></article>`;
@@ -90,13 +93,13 @@ function sessionPage() {
   const items = state.draft.items;
   const total = makeTimeline(items).reduce((sum, phase) => sum + phase.duration, 0);
   const suggestions = recommend(exercises,items).slice(0,3);
-  return `<div class="eyebrow"><span></span> VOTRE PROGRAMME</div><div class="heading-row"><div><h1>À vous de <em>jouer.</em></h1><p class="intro">Composez votre séance, ajustez vos temps et lancez-vous.</p></div><button class="secondary" data-action="new">＋ Nouvelle séance</button></div>${generatorForm()}<section class="session-layout"><div><div class="panel session-header"><label for="session-name">NOM DE LA SÉANCE</label><input id="session-name" maxlength="80" value="${escapeHtml(state.draft.name)}" placeholder="Donnez un nom à votre séance"><div class="session-stats"><span><strong>${items.length}</strong> exercice${items.length > 1 ? 's' : ''}</span><span><strong>${formatTime(total)}</strong> durée estimée</span></div></div><div class="section-heading session-title"><h2>Votre séance <span class="count">${items.length}</span></h2><button class="text-button" data-page="library">＋ Ajouter des exercices</button></div>${items.length ? items.map((item,index) => {const e=byId(item.exerciseId); return `<article class="session-item"><div class="item-number">${String(index+1).padStart(2,'0')}</div><div class="item-main"><div class="item-top"><div><div class="card-kicker">${e.category} · ${e.equipment}</div><h3>${e.name}</h3></div><div class="item-buttons"><button data-action="move-up" data-index="${index}" aria-label="Monter ${e.name}" ${index === 0 ? 'disabled' : ''}>↑</button><button data-action="move-down" data-index="${index}" aria-label="Descendre ${e.name}" ${index === items.length-1 ? 'disabled' : ''}>↓</button><button data-action="remove" data-index="${index}" aria-label="Retirer ${e.name}">×</button></div></div><div class="item-fields"><label>SÉRIES<input type="number" min="1" max="10" step="1" data-item="${index}" data-field="sets" value="${item.sets}"></label><label>EFFORT (SEC)<input type="number" min="5" max="600" step="1" data-item="${index}" data-field="work" value="${item.work}"></label><label>REPOS (SEC)<input type="number" min="0" max="300" step="1" data-item="${index}" data-field="rest" value="${item.rest}"></label></div></div></article>`;}).join('') : '<div class="empty"><strong>Votre séance prend forme ici.</strong><p>Choisissez vos premiers exercices dans la bibliothèque.</p><button class="secondary" data-page="library">Explorer les exercices ↗</button></div>'}</div><aside class="session-aside"><div class="panel launch-panel"><div class="eyebrow muted">PRÊT QUAND VOUS L’ÊTES</div><h2>On se lance ?</h2><p>Votre chronomètre vous accompagne à chaque étape.</p><button class="primary full" data-action="start" ${items.length ? '' : 'disabled'}>▶ &nbsp; Démarrer la séance</button><button class="secondary full" data-action="save" ${items.length ? '' : 'disabled'}>♡ &nbsp; Enregistrer la séance</button></div><div class="panel suggestion-panel"><div class="eyebrow muted">POUR ALLER PLUS LOIN</div><h2>À essayer <span>✦</span></h2><p>Des idées pour varier votre séance.</p>${suggestions.map(({exercise,reason}) => `<div class="suggestion"><div><strong>${exercise.name}</strong><small>${reason}</small></div><button class="add-button" data-action="add" data-id="${exercise.id}" aria-label="Ajouter ${exercise.name}">+</button></div>`).join('')}</div></aside></section>`;
+  return `<div class="eyebrow"><span></span> VOTRE PROGRAMME</div><div class="heading-row"><div><h1>À vous de <em>jouer.</em></h1><p class="intro">Composez votre séance, ajustez vos temps et lancez-vous.</p></div><button class="secondary" data-action="new">＋ Nouvelle séance</button></div>${generatorForm()}<section class="session-layout"><div><div class="panel session-header"><label for="session-name">NOM DE LA SÉANCE</label><input id="session-name" maxlength="80" value="${escapeHtml(state.draft.name)}" placeholder="Donnez un nom à votre séance"><div class="session-stats"><span><strong>${items.length}</strong> exercice${items.length > 1 ? 's' : ''}</span><span><strong>${formatTime(total)}</strong> durée estimée</span></div></div><div class="section-heading session-title"><h2>Votre séance <span class="count">${items.length}</span></h2><button class="text-button" data-page="library">＋ Ajouter des exercices</button></div>${items.length ? items.map((item,index) => {const e=byId(item.exerciseId); return `<article class="session-item"><div class="item-number">${String(index+1).padStart(2,'0')}</div>${exerciseImage(e,'item-image')}<div class="item-main"><div class="item-top"><div><div class="card-kicker">${e.category} · ${e.equipment}</div><h3>${e.name}</h3></div><div class="item-buttons"><button data-action="move-up" data-index="${index}" aria-label="Monter ${e.name}" ${index === 0 ? 'disabled' : ''}>↑</button><button data-action="move-down" data-index="${index}" aria-label="Descendre ${e.name}" ${index === items.length-1 ? 'disabled' : ''}>↓</button><button data-action="remove" data-index="${index}" aria-label="Retirer ${e.name}">×</button></div></div><div class="item-fields"><label>SÉRIES<input type="number" min="1" max="10" step="1" data-item="${index}" data-field="sets" value="${item.sets}"></label><label>EFFORT (SEC)<input type="number" min="5" max="600" step="1" data-item="${index}" data-field="work" value="${item.work}"></label><label>REPOS (SEC)<input type="number" min="0" max="300" step="1" data-item="${index}" data-field="rest" value="${item.rest}"></label></div></div></article>`;}).join('') : '<div class="empty"><strong>Votre séance prend forme ici.</strong><p>Choisissez vos premiers exercices dans la bibliothèque.</p><button class="secondary" data-page="library">Explorer les exercices ↗</button></div>'}</div><aside class="session-aside"><div class="panel launch-panel"><div class="eyebrow muted">PRÊT QUAND VOUS L’ÊTES</div><h2>On se lance ?</h2><p>Votre chronomètre vous accompagne à chaque étape.</p><button class="primary full" data-action="start" ${items.length ? '' : 'disabled'}>▶ &nbsp; Démarrer la séance</button><button class="secondary full" data-action="save" ${items.length ? '' : 'disabled'}>♡ &nbsp; Enregistrer la séance</button><button class="secondary full" data-action="export-draft" ${items.length ? '' : 'disabled'}>Exporter en JSON</button></div><div class="panel suggestion-panel"><div class="eyebrow muted">POUR ALLER PLUS LOIN</div><h2>À essayer <span>✦</span></h2><p>Des idées pour varier votre séance.</p>${suggestions.map(({exercise,reason}) => `<div class="suggestion"><div><strong>${exercise.name}</strong><small>${reason}</small></div><button class="add-button" data-action="add" data-id="${exercise.id}" aria-label="Ajouter ${exercise.name}">+</button></div>`).join('')}</div></aside></section>`;
 }
 function generatorForm() {
   return `<form class="panel generator" id="generator"><div class="eyebrow muted">VOTRE SÉANCE SUR MESURE</div><h2>Générer une séance ✦</h2><p>Choisissez une durée, repos compris, et vos objectifs. Vérifiez le matériel et adaptez les exercices à votre niveau.</p><div class="generator-fields"><label>Durée totale (minutes)<input id="generator-minutes" type="number" min="5" max="120" step="1" required value="${escapeHtml(state.generatorMinutes)}"></label><label>Autres mots-clés<input id="generator-text" type="text" value="${escapeHtml(state.generatorText)}" placeholder="Ex. squat, biceps, pull up"></label></div><p>Séparez les mots-clés par des virgules ; les noms d’exercices sont en anglais.</p><fieldset><legend>Mots-clés proposés</legend><div class="keyword-list">${GENERATOR_KEYWORDS.map(keyword => `<label><input type="checkbox" name="keyword" value="${keyword}" ${state.generatorKeywords.includes(keyword) ? 'checked' : ''}> ${keyword}</label>`).join('')}</div></fieldset><button class="primary" type="submit">Générer ma séance ↗</button></form>`;
 }
 function savedPage() {
-  return `<div class="eyebrow"><span></span> VOTRE COLLECTION</div><div class="heading-row"><div><h1>Vos séances, <em>à retrouver.</em></h1><p class="intro">Tous vos programmes enregistrés, prêts à être repris.</p></div><button class="primary" data-action="new">＋ Nouvelle séance</button></div><div class="saved-grid">${state.sessions.length ? state.sessions.map(session => `<article class="panel saved-card"><div class="eyebrow muted">SÉANCE ENREGISTRÉE</div><h2>${escapeHtml(session.name)}</h2><p>${session.items.length} exercice${session.items.length > 1 ? 's' : ''} · ${formatTime(makeTimeline(session.items).reduce((sum,phase) => sum + phase.duration,0))}</p><div class="tags">${session.items.slice(0,3).map(item => `<span>${byId(item.exerciseId).name}</span>`).join('')}</div><div class="saved-actions"><button class="primary" data-action="load" data-id="${escapeHtml(session.id)}">Ouvrir ↗</button><button class="text-button danger" data-action="delete" data-id="${escapeHtml(session.id)}">Supprimer</button></div></article>`).join('') : '<div class="empty"><strong>Pas encore de séance enregistrée.</strong><p>Créez votre premier programme et retrouvez-le ici.</p><button class="secondary" data-page="library">Explorer les exercices ↗</button></div>'}</div>`;
+  return `<div class="eyebrow"><span></span> VOTRE COLLECTION</div><div class="heading-row"><div><h1>Vos séances, <em>à retrouver.</em></h1><p class="intro">Tous vos programmes enregistrés, prêts à être repris.</p></div><div class="collection-actions"><label class="secondary import-session">Importer un JSON<input id="session-file" type="file" accept=".json,application/json"></label><button class="primary" data-action="new">＋ Nouvelle séance</button></div></div><div class="saved-grid">${state.sessions.length ? state.sessions.map(session => `<article class="panel saved-card"><div class="eyebrow muted">SÉANCE ENREGISTRÉE</div><h2>${escapeHtml(session.name)}</h2><p>${session.items.length} exercice${session.items.length > 1 ? 's' : ''} · ${formatTime(makeTimeline(session.items).reduce((sum,phase) => sum + phase.duration,0))}</p><div class="tags">${session.items.slice(0,3).map(item => `<span>${byId(item.exerciseId).name}</span>`).join('')}</div><div class="saved-actions"><button class="primary" data-action="load" data-id="${escapeHtml(session.id)}">Ouvrir ↗</button><button class="text-button" data-action="export-saved" data-id="${escapeHtml(session.id)}">Exporter JSON</button><button class="text-button danger" data-action="delete" data-id="${escapeHtml(session.id)}">Supprimer</button></div></article>`).join('') : '<div class="empty"><strong>Pas encore de séance enregistrée.</strong><p>Créez votre premier programme et retrouvez-le ici.</p><button class="secondary" data-page="library">Explorer les exercices ↗</button></div>'}</div>`;
 }
 function detailModal() {
   const exercise = byId(state.detail);
@@ -108,7 +111,10 @@ function runnerModal() {
   const done = !phase;
   const next = runner.timeline[runner.index + 1];
   const exercise = phase && byId(phase.exerciseId);
-  return `<div class="overlay runner-overlay"><section class="modal runner" role="dialog" aria-modal="true" aria-labelledby="runner-title"><button class="close" data-action="stop" aria-label="Fermer le chronomètre">×</button><div class="eyebrow"><span></span> ${done ? 'SÉANCE TERMINÉE' : phase.type === 'work' ? 'C’EST À VOUS' : 'REPRENEZ VOTRE SOUFFLE'}</div><h2 id="runner-title">${done ? 'Bravo, vous l’avez fait !' : phase.type === 'work' ? escapeHtml(exercise.name) : 'Temps de repos'}</h2><p>${done ? 'Chaque mouvement compte. À bientôt !' : phase.type === 'work' ? `Série ${phase.set} sur ${phase.sets}` : next ? `À suivre : ${escapeHtml(byId(next.exerciseId).name)} · série ${next.set}/${next.sets}` : ''}</p><div class="timer-ring ${phase?.type === 'rest' ? 'rest' : ''}"><span id="timer-display" role="timer">${formatTime(runner.remaining)}</span><small>${done ? 'BIEN JOUÉ' : runner.paused ? 'EN PAUSE' : phase.type === 'work' ? 'EFFORT' : 'REPOS'}</small></div>${done ? '<button class="primary" data-action="stop">Terminer</button>' : `<div class="runner-actions"><button class="secondary" data-action="pause">${runner.paused ? '▶ Reprendre' : 'Ⅱ Pause'}</button><button class="text-button" data-action="skip">Passer ↗</button></div><p class="runner-progress">Étape ${runner.index+1} / ${runner.timeline.length}</p>`}</section></div>`;
+  const total = runner.timeline.reduce((sum, item) => sum + item.duration, 0);
+  const elapsed = done ? total : runner.timeline.slice(0,runner.index).reduce((sum, item) => sum + item.duration, 0) + phase.duration - runner.remaining;
+  const upcoming = phase ? runner.items.slice(phase.itemIndex + 1) : [];
+  return `<div class="overlay runner-overlay"><section class="modal runner" role="dialog" aria-modal="true" aria-labelledby="runner-title"><button class="close" data-action="stop" aria-label="Fermer le chronomètre">×</button><div class="eyebrow"><span></span> ${done ? 'SÉANCE TERMINÉE' : phase.type === 'work' ? 'C’EST À VOUS' : 'REPRENEZ VOTRE SOUFFLE'}</div><h2 id="runner-title">${done ? 'Bravo, vous l’avez fait !' : phase.type === 'work' ? escapeHtml(exercise.name) : 'Temps de repos'}</h2><p>${done ? 'Chaque mouvement compte. À bientôt !' : phase.type === 'work' ? `Série ${phase.set} sur ${phase.sets}` : next ? `À suivre : ${escapeHtml(byId(next.exerciseId).name)} · série ${next.set}/${next.sets}` : ''}</p>${exercise ? `<div class="runner-current">${exerciseImage(exercise,'runner-image')}<strong>${escapeHtml(exercise.name)}</strong></div>` : ''}<div class="timer-ring ${phase?.type === 'rest' ? 'rest' : ''}"><span id="timer-display" role="timer">${formatTime(runner.remaining)}</span><small>${done ? 'BIEN JOUÉ' : runner.paused ? 'EN PAUSE' : phase.type === 'work' ? 'EFFORT' : 'REPOS'}</small></div><div class="runner-progress"><label for="session-progress">Progression de la séance ${done ? '· terminée' : `· exercice ${phase.itemIndex + 1} / ${runner.items.length}`}</label><progress id="session-progress" max="${total}" value="${elapsed}"></progress><small>Étape ${done ? runner.timeline.length : runner.index + 1} / ${runner.timeline.length}</small></div>${done ? '<button class="primary" data-action="stop">Terminer</button>' : `<div class="runner-actions"><button class="secondary" data-action="pause">${runner.paused ? '▶ Reprendre' : 'Ⅱ Pause'}</button><button class="text-button" data-action="skip">Passer ↗</button></div>${upcoming.length ? `<div class="runner-upcoming"><h3>Exercices suivants</h3><div class="upcoming-list">${upcoming.map(item => { const e = byId(item.exerciseId); return `<div class="upcoming-item">${exerciseImage(e,'upcoming-image')}<span>${escapeHtml(e.name)}</span></div>`; }).join('')}</div></div>` : ''}`}</section></div>`;
 }
 function render() {
   app.innerHTML = shell(state.page === 'library' ? library() : state.page === 'session' ? sessionPage() : savedPage());
@@ -133,10 +139,32 @@ function save() {
   persist();
   notify(warning || 'Séance enregistrée dans ce navigateur.');
 }
+function downloadSession(session) {
+  if (!session.name.trim()) return notify('Donnez un nom à votre séance avant de l’exporter.');
+  if (!session.items.length || !validItems(session.items)) return notify('Vérifiez les exercices avant d’exporter la séance.');
+  const url = URL.createObjectURL(new Blob([exportSession({...session, name:session.name.trim()})], {type:'application/json'}));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'fitness-maker-seance.json';
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+async function loadSessionFile(file) {
+  try {
+    if (file.size > 1024 * 1024) throw new Error('Le fichier dépasse la limite de 1 Mo.');
+    const session = importSession(await file.text(), byId);
+    state.sessions.push({id:uid(), ...session});
+    warning = '';
+    persist();
+    notify(warning || 'Séance importée dans Mes séances.');
+  } catch (error) {
+    notify(error.message || 'Impossible de lire ce fichier.');
+  }
+}
 function start() {
   if (!state.draft.items.length || !validItems(state.draft.items)) return notify('Vérifiez les exercices et leurs durées avant de démarrer.');
   const timeline = makeTimeline(state.draft.items);
-  state.runner = {timeline,index:0,remaining:timeline[0].duration,elapsed:0,startedAt:Date.now(),paused:false};
+  state.runner = {timeline,items:structuredClone(state.draft.items),index:0,remaining:timeline[0].duration,elapsed:0,startedAt:Date.now(),paused:false};
   speak(`C'est parti ! ${byId(timeline[0].exerciseId).name}`);
   clearInterval(timerId);
   timerId = setInterval(tick, 200);
@@ -163,6 +191,8 @@ function tick() {
     r.remaining = current.remaining;
     const display = document.querySelector('#timer-display');
     if (display) display.textContent = formatTime(r.remaining);
+    const progress = document.querySelector('#session-progress');
+    if (progress) progress.value = r.timeline.slice(0,r.index).reduce((sum, phase) => sum + phase.duration, 0) + r.timeline[r.index].duration - r.remaining;
   }
 }
 app.addEventListener('click', event => {
@@ -197,6 +227,12 @@ app.addEventListener('click', event => {
       if (state.draft.items.length && !confirm('Créer une nouvelle séance ? Les modifications non enregistrées de la séance actuelle seront perdues.')) break;
       state.draft = {id:null,name:'Ma séance',items:[]}; state.page = 'session'; persist(); render(); break;
     case 'save': save(); break;
+    case 'export-draft': downloadSession(state.draft); break;
+    case 'export-saved': {
+      const session = state.sessions.find(item => item.id === id);
+      if (session) downloadSession(session);
+      break;
+    }
     case 'load': {
       const session = state.sessions.find(item => item.id === id);
       if (!session) break;
@@ -247,6 +283,12 @@ app.addEventListener('submit', event => {
 });
 app.addEventListener('change', event => {
   const target = event.target;
+  if (target.id === 'session-file' && target.files.length) {
+    const file = target.files[0];
+    target.value = '';
+    loadSessionFile(file);
+    return;
+  }
   if (target.name === 'keyword') {
     state.generatorKeywords = target.checked ? [...state.generatorKeywords, target.value] : state.generatorKeywords.filter(keyword => keyword !== target.value);
   }
@@ -272,6 +314,7 @@ app.addEventListener('change', event => {
 });
 app.addEventListener('error', event => {
   if (event.target.matches?.('.card-image')) event.target.hidden = true;
+  else if (event.target.matches?.('.exercise-image img')) event.target.hidden = true;
   else if (event.target.matches?.('.detail-images img')) {
     event.target.alt = 'Image indisponible : vérifiez votre connexion Internet.';
     event.target.classList.add('image-unavailable');
