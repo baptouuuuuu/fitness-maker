@@ -2,6 +2,7 @@ import { exercises, exerciseById } from './exercises.js';
 import { EQUIPMENT_FILTERS } from './equipment-audit.js';
 import { STORAGE_KEY, BODY_PART_FILTERS, matchesExercise, generateSession, automaticReplacement, validGenerationFilters, recommend, validateItem, exportSession, importSession, makeTimeline, formatTime, locatePhase } from './core.js';
 import { getAnimation, saveAnimation, deleteAnimation } from './animations.js';
+import { translateInstructions } from './translation.js';
 
 const app = document.querySelector('#app');
 const byId = exerciseById;
@@ -27,6 +28,29 @@ const state = {
   generatorMinutes:'20', generatorFilters:{search:'', bodyParts:[], equipmentGroups:['mat'], types:['strength']}
 };
 let timerId;
+const translatedSteps = new Map();
+let translationRequest = 0;
+
+async function translateSteps(id) {
+  const request = ++translationRequest;
+  if (translatedSteps.has(id)) return;
+  if (!('Translator' in globalThis)) {
+    state.translationStatus = 'La traduction française est indisponible dans ce navigateur. Instructions originales en anglais :';
+    render();
+    return;
+  }
+  state.translationStatus = 'Traduction en français en cours. Instructions originales en anglais :';
+  render();
+  try {
+    translatedSteps.set(id, await translateInstructions(byId(id).steps));
+    if (request === translationRequest && state.detail === id) { state.translationStatus = ''; render(); }
+  } catch {
+    if (request === translationRequest && state.detail === id) {
+      state.translationStatus = 'La traduction française est indisponible. Instructions originales en anglais :';
+      render();
+    }
+  }
+}
 
 function clearAnimation() {
   if (state.animationUrl) URL.revokeObjectURL(state.animationUrl);
@@ -35,7 +59,9 @@ function clearAnimation() {
 async function showDetail(id) {
   clearAnimation();
   state.detail = id;
+  state.translationStatus = '';
   render();
+  translateSteps(id);
   try {
     const file = await getAnimation(id);
     if (state.detail === id && file) { clearAnimation(); state.animationUrl = URL.createObjectURL(file); render(); }
@@ -108,7 +134,7 @@ function savedPage() {
 }
 function detailModal() {
   const exercise = byId(state.detail);
-  return `<div class="overlay"><section class="modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title"><button class="close" data-action="close-detail" aria-label="Fermer">×</button><div class="detail-art">${state.animationUrl ? `<img class="exercise-animation" src="${state.animationUrl}" alt="Animation de ${escapeHtml(exercise.name)}">` : ''}${exerciseImage(exercise,'detail-images')}<label class="secondary upload-animation">Importer une animation<input id="animation-file" type="file" accept="image/gif,image/webp,image/png"></label>${state.animationUrl ? '<button class="text-button" data-action="delete-animation">Supprimer mon animation</button>' : ''}<span>Importez un fichier dont vous détenez les droits. Il reste dans ce navigateur.</span></div><div class="detail-content"><div class="eyebrow muted">${exercise.category} · ${exercise.equipmentDetail}</div><h2 id="detail-title">${escapeHtml(exercise.name)}</h2><div class="tags">${exercise.muscles.map(m => `<span>${escapeHtml(m)}</span>`).join('')}${exercise.mobility ? '<span>Étirements / mobilité</span>' : ''}</div><h3>Le mouvement, étape par étape${exercise.images ? ' (en anglais)' : ''}</h3><ol>${exercise.steps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol><button class="primary full" data-action="add" data-id="${exercise.id}">${state.replaceIndex !== null ? '↺ Choisir cet exercice' : '＋ Ajouter à ma séance'}</button></div></section></div>`;
+  return `<div class="overlay detail-overlay"><section class="modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title"><button class="close" data-action="close-detail" aria-label="Fermer">×</button><div class="detail-art">${state.animationUrl ? `<img class="exercise-animation" src="${state.animationUrl}" alt="Animation de ${escapeHtml(exercise.name)}">` : ''}${exerciseImage(exercise,'detail-images')}<label class="secondary upload-animation">Importer une animation<input id="animation-file" type="file" accept="image/gif,image/webp,image/png"></label>${state.animationUrl ? '<button class="text-button" data-action="delete-animation">Supprimer mon animation</button>' : ''}<span>Importez un fichier dont vous détenez les droits. Il reste dans ce navigateur.</span></div><div class="detail-content"><div class="eyebrow muted">${exercise.category} · ${exercise.equipmentDetail}</div><h2 id="detail-title">${escapeHtml(exercise.name)}</h2><div class="tags">${exercise.muscles.map(m => `<span>${escapeHtml(m)}</span>`).join('')}${exercise.mobility ? '<span>Étirements / mobilité</span>' : ''}</div><h3>Le mouvement, étape par étape</h3>${state.translationStatus ? `<p role="status">${escapeHtml(state.translationStatus)}</p>` : ''}<ol>${(translatedSteps.get(exercise.id) || exercise.steps).map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol>${state.runner ? '<p>Le chronomètre continue pendant la consultation.</p>' : `<button class="primary full" data-action="add" data-id="${exercise.id}">${state.replaceIndex !== null ? '↺ Choisir cet exercice' : '＋ Ajouter à ma séance'}</button>`}</div></section></div>`;
 }
 function runnerModal() {
   const runner = state.runner;
@@ -119,7 +145,7 @@ function runnerModal() {
   const total = runner.timeline.reduce((sum, item) => sum + item.duration, 0);
   const elapsed = done ? total : runner.timeline.slice(0,runner.index).reduce((sum, item) => sum + item.duration, 0) + phase.duration - runner.remaining;
   const upcoming = phase ? runner.items.slice(phase.itemIndex + 1) : [];
-  return `<div class="overlay runner-overlay"><section class="modal runner" role="dialog" aria-modal="true" aria-labelledby="runner-title"><button class="close" data-action="stop" aria-label="Fermer le chronomètre">×</button><div class="eyebrow"><span></span> ${done ? 'SÉANCE TERMINÉE' : phase.type === 'work' ? 'C’EST À VOUS' : 'REPRENEZ VOTRE SOUFFLE'}</div><h2 id="runner-title">${done ? 'Bravo, vous l’avez fait !' : phase.type === 'work' ? escapeHtml(exercise.name) : 'Temps de repos'}</h2><p>${done ? 'Chaque mouvement compte. À bientôt !' : phase.type === 'work' ? `Série ${phase.set} sur ${phase.sets}` : next ? `À suivre : ${escapeHtml(byId(next.exerciseId).name)} · série ${next.set}/${next.sets}` : ''}</p>${exercise ? `<div class="runner-current">${exerciseImage(exercise,'runner-image')}<strong>${escapeHtml(exercise.name)}</strong></div>` : ''}<div class="timer-ring ${phase?.type === 'rest' ? 'rest' : ''}"><span id="timer-display" role="timer">${formatTime(runner.remaining)}</span><small>${done ? 'BIEN JOUÉ' : runner.paused ? 'EN PAUSE' : phase.type === 'work' ? 'EFFORT' : 'REPOS'}</small></div><div class="runner-progress"><label for="session-progress">Progression de la séance ${done ? '· terminée' : `· exercice ${phase.itemIndex + 1} / ${runner.items.length}`}</label><progress id="session-progress" max="${total}" value="${elapsed}"></progress><small>Étape ${done ? runner.timeline.length : runner.index + 1} / ${runner.timeline.length}</small></div>${done ? '<button class="primary" data-action="stop">Terminer</button>' : `<div class="runner-actions"><button class="secondary" data-action="pause">${runner.paused ? '▶ Reprendre' : 'Ⅱ Pause'}</button><button class="text-button" data-action="skip">Passer ↗</button></div>${upcoming.length ? `<div class="runner-upcoming"><h3>Exercices suivants</h3><div class="upcoming-list">${upcoming.map(item => { const e = byId(item.exerciseId); return `<div class="upcoming-item">${exerciseImage(e,'upcoming-image')}<span>${escapeHtml(e.name)}</span></div>`; }).join('')}</div></div>` : ''}`}</section></div>`;
+  return `<div class="overlay runner-overlay"><section class="modal runner" role="dialog" aria-modal="true" aria-labelledby="runner-title"><button class="close" data-action="stop" aria-label="Fermer le chronomètre">×</button><div class="eyebrow"><span></span> ${done ? 'SÉANCE TERMINÉE' : phase.type === 'work' ? 'C’EST À VOUS' : 'REPRENEZ VOTRE SOUFFLE'}</div><h2 id="runner-title">${done ? 'Bravo, vous l’avez fait !' : phase.type === 'work' ? escapeHtml(exercise.name) : 'Temps de repos'}</h2>${done ? '<p>Chaque mouvement compte. À bientôt !</p>' : `<div class="runner-sets">${phase.type === 'work' ? `Série <strong>${phase.set} / ${phase.sets}</strong>` : `Séries terminées <strong>${phase.set} / ${phase.sets}</strong>`}</div>${phase.type === 'rest' && next ? `<p>À suivre : ${escapeHtml(byId(next.exerciseId).name)} · série ${next.set} / ${next.sets}</p>` : ''}`}${exercise ? `<div class="runner-current">${exerciseImage(exercise,'runner-image')}<strong>${escapeHtml(exercise.name)}</strong><button class="text-button runner-detail" data-action="detail" data-id="${escapeHtml(exercise.id)}">Voir l’exercice ↗</button></div>` : ''}<div class="timer-ring ${phase?.type === 'rest' ? 'rest' : ''}"><span id="timer-display" role="timer">${formatTime(runner.remaining)}</span><small>${done ? 'BIEN JOUÉ' : runner.paused ? 'EN PAUSE' : phase.type === 'work' ? 'EFFORT' : 'REPOS'}</small></div><div class="runner-progress"><label for="session-progress">Progression de la séance ${done ? '· terminée' : `· exercice ${phase.itemIndex + 1} / ${runner.items.length}`}</label><progress id="session-progress" max="${total}" value="${elapsed}"></progress><small>Étape ${done ? runner.timeline.length : runner.index + 1} / ${runner.timeline.length}</small></div>${done ? '<button class="primary" data-action="stop">Terminer</button>' : `<div class="runner-actions"><button class="secondary" data-action="pause">${runner.paused ? '▶ Reprendre' : 'Ⅱ Pause'}</button><button class="text-button" data-action="skip">Passer ↗</button></div>${upcoming.length ? `<div class="runner-upcoming"><h3>Exercices suivants</h3><div class="upcoming-list">${upcoming.map(item => { const e = byId(item.exerciseId); return `<div class="upcoming-item">${exerciseImage(e,'upcoming-image')}<span>${escapeHtml(e.name)}</span></div>`; }).join('')}</div></div>` : ''}`}</section></div>`;
 }
 function render() {
   app.innerHTML = shell(state.page === 'library' ? library() : state.page === 'session' ? sessionPage() : state.page === 'generator' ? generatorPage() : savedPage());
