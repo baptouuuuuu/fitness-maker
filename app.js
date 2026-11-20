@@ -1,9 +1,9 @@
-import { exercises } from './exercises.js';
+import { exercises, exerciseById } from './exercises.js';
 import { STORAGE_KEY, GENERATOR_KEYWORDS, generateSession, recommend, validateItem, makeTimeline, formatTime, locatePhase } from './core.js';
 import { getAnimation, saveAnimation, deleteAnimation } from './animations.js';
 
 const app = document.querySelector('#app');
-const byId = id => exercises.find(exercise => exercise.id === id);
+const byId = exerciseById;
 const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const uid = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 let warning = '';
@@ -67,14 +67,14 @@ function navButton(page, icon, label) {
   return `<button class="nav-link ${state.page === page ? 'active' : ''}" data-page="${page}" ${state.page === page ? 'aria-current="page"' : ''}><span aria-hidden="true">${icon}</span>${label}${page === 'session' ? `<span class="nav-count">${state.draft.items.length}</span>` : ''}</button>`;
 }
 function shell(content) {
-  return `<div class="layout"><aside class="sidebar"><div class="brand"><span class="brand-mark">✳</span><div>fitness<span>maker</span><small>VOTRE ESPACE À VOUS</small></div></div><div class="nav-label">ESPACE PERSONNEL</div><nav aria-label="Navigation principale">${navButton('library','▦','Bibliothèque')}${navButton('session','◫','Ma séance')}${navButton('saved','♡','Mes séances')}</nav><div class="sidebar-bottom"><span>✦</span><div><strong>À votre rythme.</strong><p>Chaque mouvement compte.</p></div></div></aside><main><header class="topbar"><span>VOTRE ESPACE FITNESS</span><button class="sound-toggle" data-action="sound" aria-pressed="${state.sound}">${state.sound ? '♪ Son activé' : '♪ Son désactivé'}</button></header>${warning ? `<div class="notice" role="alert">${escapeHtml(warning)} <button data-action="dismiss" aria-label="Fermer">×</button></div>` : ''}<div class="content">${content}</div><footer>Conçu pour bouger à votre rythme · Données enregistrées dans ce navigateur</footer></main></div>${state.detail ? detailModal() : ''}${state.runner ? runnerModal() : ''}`;
+  return `<div class="layout"><aside class="sidebar"><div class="brand"><span class="brand-mark">✳</span><div>fitness<span>maker</span><small>VOTRE ESPACE À VOUS</small></div></div><div class="nav-label">ESPACE PERSONNEL</div><nav aria-label="Navigation principale">${navButton('library','▦','Bibliothèque')}${navButton('session','◫','Ma séance')}${navButton('saved','♡','Mes séances')}</nav><div class="sidebar-bottom"><span>✦</span><div><strong>À votre rythme.</strong><p>Chaque mouvement compte.</p></div></div></aside><main><header class="topbar"><span>VOTRE ESPACE FITNESS</span><button class="sound-toggle" data-action="sound" aria-pressed="${state.sound}">${state.sound ? '♪ Son activé' : '♪ Son désactivé'}</button></header>${warning ? `<div class="notice" role="alert">${escapeHtml(warning)} <button data-action="dismiss" aria-label="Fermer">×</button></div>` : ''}<div class="content">${content}</div><footer>Conçu pour bouger à votre rythme · Données enregistrées dans ce navigateur · Exercise data by <a href="https://repdb.co" target="_blank" rel="noopener noreferrer">RepDB (repdb.co)</a></footer></main></div>${state.detail ? detailModal() : ''}${state.runner ? runnerModal() : ''}`;
 }
 function options(values, selected) {
   return values.map(value => `<option ${value === selected ? 'selected' : ''}>${escapeHtml(value)}</option>`).join('');
 }
 function card(exercise, rec) {
   const favorite = state.favorites.includes(exercise.id);
-  return `<article class="exercise-card"><div class="card-art"><span class="level">${escapeHtml(exercise.equipmentDetail)}</span><button class="favorite ${favorite ? 'selected' : ''}" data-action="favorite" data-id="${exercise.id}" aria-label="${favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'} : ${escapeHtml(exercise.name)}" aria-pressed="${favorite}">${favorite ? '♥' : '♡'}</button><button class="art-button" data-action="detail" data-id="${exercise.id}" aria-label="Voir ${escapeHtml(exercise.name)}"><span class="art-symbol">✳</span></button><span class="art-label">EXERCICE ${exercise.id}</span></div><div class="card-body"><div class="card-kicker">${exercise.category} <span>·</span> ${exercise.equipment}</div><h3>${escapeHtml(exercise.name)}</h3><div class="tags">${exercise.muscles.map(m => `<span>${escapeHtml(m)}</span>`).join('')}</div>${state.sort === 'relevance' ? `<p class="reason">✦ ${rec.reason}</p>` : ''}<div class="card-actions"><button class="text-button" data-action="detail" data-id="${exercise.id}">Voir l’exercice ↗</button><button class="add-button" data-action="add" data-id="${exercise.id}" aria-label="Ajouter ${escapeHtml(exercise.name)} à la séance">+</button></div></div></article>`;
+  return `<article class="exercise-card"><div class="card-art"><span class="level">${escapeHtml(exercise.equipmentDetail)}</span><button class="favorite ${favorite ? 'selected' : ''}" data-action="favorite" data-id="${exercise.id}" aria-label="${favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'} : ${escapeHtml(exercise.name)}" aria-pressed="${favorite}">${favorite ? '♥' : '♡'}</button><button class="art-button" data-action="detail" data-id="${exercise.id}" aria-label="Voir ${escapeHtml(exercise.name)}"><span class="art-symbol">✳</span><img class="card-image" src="${escapeHtml(exercise.images[0])}" alt="" loading="lazy"></button></div><div class="card-body"><div class="card-kicker">${exercise.category} <span>·</span> ${exercise.equipment}</div><h3>${escapeHtml(exercise.name)}</h3><div class="tags">${exercise.muscles.map(m => `<span>${escapeHtml(m)}</span>`).join('')}</div>${state.sort === 'relevance' ? `<p class="reason">✦ ${rec.reason}</p>` : ''}<div class="card-actions"><button class="text-button" data-action="detail" data-id="${exercise.id}">Voir l’exercice ↗</button><button class="add-button" data-action="add" data-id="${exercise.id}" aria-label="Ajouter ${escapeHtml(exercise.name)} à la séance">+</button></div></div></article>`;
 }
 function library() {
   const ranked = recommend(exercises, state.draft.items);
@@ -100,7 +100,7 @@ function savedPage() {
 }
 function detailModal() {
   const exercise = byId(state.detail);
-  return `<div class="overlay"><section class="modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title"><button class="close" data-action="close-detail" aria-label="Fermer">×</button><div class="detail-art">${state.animationUrl ? `<img class="exercise-animation" src="${state.animationUrl}" alt="Animation de ${escapeHtml(exercise.name)}">` : '<span class="art-symbol">✳</span>'}<label class="secondary upload-animation">Importer une animation<input id="animation-file" type="file" accept="image/gif,image/webp,image/png"></label>${state.animationUrl ? '<button class="text-button" data-action="delete-animation">Supprimer mon animation</button>' : ''}<span>Importez un fichier dont vous détenez les droits. Il reste dans ce navigateur.</span><a class="media-link" href="${exercise.mediaUrl}" target="_blank" rel="noopener noreferrer">Voir l’animation originale ↗</a><span>© Gym visual — gymvisual.com</span></div><div class="detail-content"><div class="eyebrow muted">${exercise.category} · ${exercise.equipmentDetail}</div><h2 id="detail-title">${escapeHtml(exercise.name)}</h2><div class="tags">${exercise.muscles.map(m => `<span>${escapeHtml(m)}</span>`).join('')}</div><h3>Le mouvement, étape par étape</h3><ol>${exercise.steps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol><button class="primary full" data-action="add" data-id="${exercise.id}">＋ Ajouter à ma séance</button></div></section></div>`;
+  return `<div class="overlay"><section class="modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title"><button class="close" data-action="close-detail" aria-label="Fermer">×</button><div class="detail-art">${state.animationUrl ? `<img class="exercise-animation" src="${state.animationUrl}" alt="Animation de ${escapeHtml(exercise.name)}">` : exercise.images?.length ? `<div class="detail-images">${exercise.images.map((image,index) => `<img src="${escapeHtml(image)}" alt="${escapeHtml(exercise.name)} : ${exercise.images.length > 1 ? index ? 'position finale' : 'position initiale' : 'position'}">`).join('')}</div>` : '<span class="art-symbol">✳</span>'}<label class="secondary upload-animation">Importer une animation<input id="animation-file" type="file" accept="image/gif,image/webp,image/png"></label>${state.animationUrl ? '<button class="text-button" data-action="delete-animation">Supprimer mon animation</button>' : ''}<span>Importez un fichier dont vous détenez les droits. Il reste dans ce navigateur.</span></div><div class="detail-content"><div class="eyebrow muted">${exercise.category} · ${exercise.equipmentDetail}</div><h2 id="detail-title">${escapeHtml(exercise.name)}</h2><div class="tags">${exercise.muscles.map(m => `<span>${escapeHtml(m)}</span>`).join('')}</div><h3>Le mouvement, étape par étape${exercise.images ? ' (en anglais)' : ''}</h3><ol>${exercise.steps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol><button class="primary full" data-action="add" data-id="${exercise.id}">＋ Ajouter à ma séance</button></div></section></div>`;
 }
 function runnerModal() {
   const runner = state.runner;
@@ -270,6 +270,13 @@ app.addEventListener('change', event => {
     } else { item[field] = value; persist(); render(); }
   }
 });
+app.addEventListener('error', event => {
+  if (event.target.matches?.('.card-image')) event.target.hidden = true;
+  else if (event.target.matches?.('.detail-images img')) {
+    event.target.alt = 'Image indisponible : vérifiez votre connexion Internet.';
+    event.target.classList.add('image-unavailable');
+  }
+}, true);
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && state.detail) { state.detail = null; clearAnimation(); render(); }
 });

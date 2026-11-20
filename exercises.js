@@ -1,14 +1,19 @@
-import data from './exercises-data.js';
+import data from './repdb-data.js';
+import { legacyExercises } from './legacy-exercises.js';
 
-const categories = {back:'Dos',cardio:'Cardio',chest:'Pectoraux','lower arms':'Avant-bras','lower legs':'Mollets',neck:'Cou',shoulders:'Épaules','upper arms':'Bras','upper legs':'Jambes',waist:'Abdominaux'};
-const muscles = {abductors:'Abducteurs',abs:'Abdominaux',adductors:'Adducteurs',biceps:'Biceps',calves:'Mollets','cardiovascular system':'Cardio',delts:'Épaules',forearms:'Avant-bras',glutes:'Fessiers',hamstrings:'Ischio-jambiers',lats:'Grand dorsal','levator scapulae':'Élévateur de la scapula',pectorals:'Pectoraux',quads:'Quadriceps','serratus anterior':'Dentelé antérieur',spine:'Rachis',traps:'Trapèzes',triceps:'Triceps','upper back':'Haut du dos'};
-const equipmentNames = {'body weight':'Poids du corps',dumbbell:'Haltères',barbell:'Barre',weighted:'Lest',kettlebell:'Kettlebell',cable:'Poulie',band:'Élastique','resistance band':'Élastique de résistance','ez barbell':'Barre EZ','olympic barbell':'Barre olympique','trap bar':'Trap bar','medicine ball':'Medecine-ball','leverage machine':'Machine à levier','smith machine':'Machine Smith',assisted:'Assistance','stability ball':'Ballon de stabilité','bosu ball':'Bosu',roller:'Rouleau','wheel roller':'Roue abdominale',rope:'Corde',hammer:'Marteau','elliptical machine':'Vélo elliptique','stationary bike':'Vélo stationnaire','skierg machine':'SkiErg','sled machine':'Traîneau','stepmill machine':'Escalier','upper body ergometer':'Ergomètre bras',tire:'Pneu'};
-const weighted = new Set(['dumbbell','barbell','weighted','kettlebell','ez barbell','olympic barbell','trap bar','medicine ball']);
+const categories = {back:'Dos',chest:'Pectoraux',core:'Abdominaux',full_body:'Corps entier',lower_arms:'Avant-bras',lower_legs:'Mollets',shoulders:'Épaules',upper_arms:'Bras',upper_legs:'Jambes'};
+const muscles = {abductors:'Abducteurs',adductors:'Adducteurs',anterior_deltoid:'Épaules',biceps_brachii:'Biceps',brachialis:'Bras',brachioradialis:'Avant-bras',erector_spinae:'Dos',forearm_extensors:'Avant-bras',forearm_flexors:'Avant-bras',gastrocnemius:'Mollets',gluteus_maximus:'Fessiers',gluteus_medius:'Fessiers',hamstrings:'Ischio-jambiers',hip_flexors:'Fléchisseurs de hanche',infraspinatus_teres_minor:'Épaules',lateral_deltoid:'Épaules',latissimus_dorsi:'Grand dorsal',obliques:'Abdominaux',pectoralis_major:'Pectoraux',posterior_deltoid:'Épaules',quadratus_lumborum:'Dos',quadriceps:'Quadriceps',rectus_abdominis:'Abdominaux',rhomboids:'Haut du dos',soleus:'Mollets',tibialis_anterior:'Jambes',transverse_abdominis:'Abdominaux',trapezius:'Trapèzes',triceps_brachii:'Triceps'};
+const equipmentNames = {barbell:'Barre',dumbbell:'Haltères',kettlebell:'Kettlebell',cable:'Poulie',pull_up_bar:'Barre de traction',resistance_band:'Élastique',loop_band:'Élastique',bodyweight:'Poids du corps',rings:'Anneaux',smith_machine:'Machine Smith',ez_bar:'Barre EZ'};
+const weighted = new Set(['barbell','dumbbell','kettlebell','ez_bar','trap_bar','plates','medicine_ball','sandbag']);
+const imageBase = 'https://raw.githubusercontent.com/RepDB/exercise-dataset/f12da458a90f353a86c953f204304d5a8bd98275/';
+
 export const exercises = data.map(e => ({
-  id:e.id, name:e.name, category:categories[e.category] || e.category,
-  equipment:e.equipment === 'body weight' ? 'Sans poids' : weighted.has(e.equipment) ? 'Avec poids' : 'Autre matériel',
-  equipmentDetail:equipmentNames[e.equipment] || e.equipment,
-  muscles:[muscles[e.target] || e.target],
-  movement:e.target, steps:e.steps,
-  mediaUrl:`https://github.com/hasaneyldrm/exercises-dataset/blob/7455efae41b330c265e7cd4b78dfa848e7ce5ebd/${e.gif}`
+  id:`repdb:${e.id}`, name:e.name, category:e.category === 'cardio' ? 'Cardio' : categories[e.bodyPart] || e.bodyPart,
+  equipment:!e.equipment ? 'Sans poids' : weighted.has(e.equipment) ? 'Avec poids' : 'Autre matériel',
+  equipmentDetail:equipmentNames[e.equipment] || (e.equipment ? e.equipment.replaceAll('_',' ') : 'Poids du corps'),
+  muscles:[...new Set(e.muscles.map(m => muscles[m] || m))],
+  movement:e.muscles[0], steps:e.steps, images:[e.images.main, e.images.start, e.images.peak].filter(Boolean).map(path => imageBase + path)
 }));
+
+const catalogById = new Map([...legacyExercises, ...exercises].map(exercise => [exercise.id, exercise]));
+export const exerciseById = id => catalogById.get(id);

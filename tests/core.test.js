@@ -1,12 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { exercises } from '../exercises.js';
-import { generateSession, recommend, validateItem, makeTimeline, locatePhase, formatTime } from '../core.js';
+import { exercises, exerciseById } from '../exercises.js';
+import { GENERATOR_KEYWORDS, generateSession, recommend, validateItem, makeTimeline, locatePhase, formatTime } from '../core.js';
 
-test('catalogue complet, identifiants uniques et consignes françaises', () => {
-  assert.equal(exercises.length, 1324);
+test('catalogue RepDB complet et séances précédentes conservées', () => {
+  assert.equal(exercises.length, 708);
   assert.equal(new Set(exercises.map(e => e.id)).size, exercises.length);
-  assert.ok(exercises.every(e => e.steps.length && e.mediaUrl.startsWith('https://github.com/hasaneyldrm/exercises-dataset/blob/')));
+  assert.ok(exercises.every(e => e.steps.length && e.images.length && e.images.every(url => url.startsWith('https://raw.githubusercontent.com/RepDB/exercise-dataset/f12da458a90f353a86c953f204304d5a8bd98275/images/flat/'))));
+  assert.equal(exerciseById('0001').name, '3/4 sit-up');
+  assert.equal(exerciseById('repdb:muscle-ups').name, 'Muscle Ups');
 });
 test('chronologie : séries, repos intermédiaires et aucun repos final', () => {
   const items = [{exerciseId:'a',sets:2,work:10,rest:5},{exerciseId:'b',sets:1,work:20,rest:0}];
@@ -42,6 +44,7 @@ test('générateur : mots-clés français, durée exacte avec repos et paramètr
   }
 });
 test('générateur : termes libres et erreurs explicites', () => {
+  for (const keyword of GENERATOR_KEYWORDS) assert.ok(generateSession(exercises, 5, [keyword]).length, keyword);
   assert.ok(generateSession(exercises, 5, ['squat']).every(item => /squat/i.test(exercises.find(e => e.id === item.exerciseId).name)));
   assert.throws(() => generateSession(exercises, 4, ['abdos']), /durée/);
   assert.throws(() => generateSession(exercises, 5.5, ['abdos']), /durée/);
