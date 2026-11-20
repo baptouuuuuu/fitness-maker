@@ -1,6 +1,6 @@
 import { exercises, exerciseById } from './exercises.js';
 import { EQUIPMENT_FILTERS } from './equipment-audit.js';
-import { STORAGE_KEY, matchesExercise, generateSession, automaticReplacement, validGenerationFilters, recommend, validateItem, exportSession, importSession, makeTimeline, formatTime, locatePhase } from './core.js';
+import { STORAGE_KEY, BODY_PART_FILTERS, matchesExercise, generateSession, automaticReplacement, validGenerationFilters, recommend, validateItem, exportSession, importSession, makeTimeline, formatTime, locatePhase } from './core.js';
 import { getAnimation, saveAnimation, deleteAnimation } from './animations.js';
 
 const app = document.querySelector('#app');
@@ -19,12 +19,12 @@ try {
 }
 const validItems = items => Array.isArray(items) && items.every(item => validateItem(item) && byId(item.exerciseId));
 const state = {
-  page:'library', search:'', categories:[], equipmentGroups:['mat'], types:[], sort:'name', onlyFavorites:false, limit:24,
+  page:'library', search:'', bodyParts:[], equipmentGroups:['mat'], types:[], sort:'name', onlyFavorites:false, limit:24,
   favorites:Array.isArray(saved.favorites) ? saved.favorites.filter(id => byId(id)) : [],
   sessions:Array.isArray(saved.sessions) ? saved.sessions.filter(session => session && typeof session.id === 'string' && typeof session.name === 'string' && validItems(session.items)) : [],
   draft:saved.draft && typeof saved.draft.name === 'string' && validItems(saved.draft.items) ? saved.draft : {id:null, name:'Ma séance', items:[]},
   sound:saved.sound !== false, detail:null, runner:null, animationUrl:null, replaceIndex:null,
-  generatorMinutes:'20', generatorFilters:{search:'', categories:[], equipmentGroups:['mat'], types:[]}
+  generatorMinutes:'20', generatorFilters:{search:'', bodyParts:[], equipmentGroups:['mat'], types:[]}
 };
 let timerId;
 
@@ -71,8 +71,7 @@ function shell(content) {
   return `<div class="layout"><aside class="sidebar"><div class="brand"><span class="brand-mark">✳</span><div>fitness<span>maker</span><small>VOTRE ESPACE À VOUS</small></div></div><div class="nav-label">ESPACE PERSONNEL</div><nav aria-label="Navigation principale">${navButton('library','▦','Bibliothèque')}${navButton('session','◫','Ma séance')}${navButton('generator','✦','Générateur')}${navButton('saved','♡','Mes séances')}</nav><div class="sidebar-bottom"><span>✦</span><div><strong>À votre rythme.</strong><p>Chaque mouvement compte.</p></div></div></aside><main><header class="topbar"><span>VOTRE ESPACE FITNESS</span><button class="sound-toggle" data-action="sound" aria-pressed="${state.sound}">${state.sound ? '♪ Son activé' : '♪ Son désactivé'}</button></header>${warning ? `<div class="notice" role="alert">${escapeHtml(warning)} <button data-action="dismiss" aria-label="Fermer">×</button></div>` : ''}<div class="content">${content}</div><footer>Conçu pour bouger à votre rythme · Données enregistrées dans ce navigateur · Exercise data by <a href="https://repdb.co" target="_blank" rel="noopener noreferrer">RepDB (repdb.co)</a></footer></main></div>${state.detail ? detailModal() : ''}${state.runner ? runnerModal() : ''}`;
 }
 function filtersUI(filters, scope) {
-  const categories = [...new Set(exercises.map(exercise => exercise.category))].sort((a,b) => a.localeCompare(b,'fr'));
-  return `<div class="filters"><label class="search"><span aria-hidden="true">⌕</span><input type="search" data-search="${scope}" placeholder="Rechercher en français ou en anglais..." value="${escapeHtml(filters.search)}" aria-label="Rechercher un exercice ou un muscle"></label></div><fieldset class="equipment-filters"><legend>Parties du corps <small>— plusieurs choix possibles</small></legend><div class="keyword-list">${categories.map(category => `<label><input type="checkbox" data-category="${scope}" value="${escapeHtml(category)}" ${filters.categories.includes(category) ? 'checked' : ''}> ${escapeHtml(category)}</label>`).join('')}</div><small>Sans sélection : toutes les parties du corps.</small></fieldset><fieldset class="equipment-filters"><legend>Type d’exercice <small>— plusieurs choix possibles</small></legend><div class="keyword-list">${[['strength','Renforcement'],['stretching','Étirement'],['mobility','Mobilité']].map(([value,label]) => `<label><input type="checkbox" data-exercise-type="${scope}" value="${value}" ${filters.types.includes(value) ? 'checked' : ''}> ${label}</label>`).join('')}</div><small>Sans sélection : tous les types d’exercice.</small></fieldset><fieldset class="equipment-filters"><legend>Matériel disponible <small>— plusieurs choix possibles</small></legend><div class="keyword-list">${EQUIPMENT_FILTERS.map(([value,label]) => `<label><input type="checkbox" data-equipment-group="${scope}" value="${value}" ${filters.equipmentGroups.includes(value) ? 'checked' : ''}> ${label}</label>`).join('')}</div><small>Sans sélection : exercices sans matériel. Seuls les exercices compatibles avec votre matériel sont affichés ; le tapis est facultatif. Machines regroupe les autres équipements de salle.</small></fieldset>`;
+  return `<div class="filters"><label class="search"><span aria-hidden="true">⌕</span><input type="search" data-search="${scope}" placeholder="Rechercher en français ou en anglais..." value="${escapeHtml(filters.search)}" aria-label="Rechercher un exercice ou un muscle"></label></div><fieldset class="equipment-filters"><legend>Parties du corps <small>— plusieurs choix possibles</small></legend><div class="keyword-list">${BODY_PART_FILTERS.map(({id,label}) => `<label><input type="checkbox" data-body-part="${scope}" value="${id}" ${filters.bodyParts.includes(id) ? 'checked' : ''}> ${label}</label>`).join('')}</div><small>Sans sélection : toutes les parties du corps.</small></fieldset><fieldset class="equipment-filters"><legend>Type d’exercice <small>— plusieurs choix possibles</small></legend><div class="keyword-list">${[['strength','Renforcement'],['stretching','Étirement'],['mobility','Mobilité']].map(([value,label]) => `<label><input type="checkbox" data-exercise-type="${scope}" value="${value}" ${filters.types.includes(value) ? 'checked' : ''}> ${label}</label>`).join('')}</div><small>Sans sélection : tous les types d’exercice.</small></fieldset><fieldset class="equipment-filters"><legend>Matériel disponible <small>— plusieurs choix possibles</small></legend><div class="keyword-list">${EQUIPMENT_FILTERS.map(([value,label]) => `<label><input type="checkbox" data-equipment-group="${scope}" value="${value}" ${filters.equipmentGroups.includes(value) ? 'checked' : ''}> ${label}</label>`).join('')}</div><small>Sans sélection : exercices sans matériel. Seuls les exercices compatibles avec votre matériel sont affichés ; le tapis est facultatif. Machines regroupe les autres équipements de salle.</small></fieldset>`;
 }
 function itemField(index, field, label, value, min, max, increment) {
   return `<label>${label}<span class="stepper"><button type="button" data-action="adjust" data-index="${index}" data-field="${field}" data-delta="-${increment}" aria-label="Diminuer ${label.toLowerCase()}" ${value <= min ? 'disabled' : ''}>−</button><input type="number" min="${min}" max="${max}" step="1" data-item="${index}" data-field="${field}" value="${value}" aria-label="${label}"><button type="button" data-action="adjust" data-index="${index}" data-field="${field}" data-delta="${increment}" aria-label="Augmenter ${label.toLowerCase()}" ${value >= max ? 'disabled' : ''}>+</button></span></label>`;
@@ -245,7 +244,7 @@ app.addEventListener('click', event => {
     case 'replace':
       if (!state.draft.items[index]) break;
       state.replaceIndex = index;
-      state.search = ''; state.categories = []; state.equipmentGroups = ['mat']; state.types = []; state.onlyFavorites = false; state.limit = 24;
+      state.search = ''; state.bodyParts = []; state.equipmentGroups = ['mat']; state.types = []; state.onlyFavorites = false; state.limit = 24;
       state.page = 'library'; render(); window.scrollTo(0,0); break;
     case 'replace-auto': {
       if (!validGenerationFilters(state.draft.generationFilters) || !state.draft.items[index]) break;
@@ -341,9 +340,9 @@ app.addEventListener('change', event => {
     loadSessionFile(file);
     return;
   }
-  if (target.dataset.category) {
-    const filters = target.dataset.category === 'generator' ? state.generatorFilters : state;
-    filters.categories = target.checked ? [...filters.categories, target.value] : filters.categories.filter(category => category !== target.value);
+  if (target.dataset.bodyPart) {
+    const filters = target.dataset.bodyPart === 'generator' ? state.generatorFilters : state;
+    filters.bodyParts = target.checked ? [...filters.bodyParts, target.value] : filters.bodyParts.filter(bodyPart => bodyPart !== target.value);
     state.limit = 24; render(); return;
   }
   if (target.dataset.equipmentGroup) {
