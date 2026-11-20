@@ -1,3 +1,5 @@
+import { equipmentFilterFor } from './equipment-audit.js';
+
 export const STORAGE_KEY = 'fitness-maker-v1';
 
 const normalize = text => text.toLocaleLowerCase('fr').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -19,15 +21,14 @@ const frenchNames = [
   [/\b(biceps)\b/i, 'biceps'], [/\b(triceps)\b/i, 'triceps']
 ];
 
-export function matchesExercise(exercise, {search = '', category = '', equipment = '', equipmentGroups = [], mobility = 'all'} = {}) {
+export function matchesExercise(exercise, {search = '', category = '', equipmentGroups = ['mat'], types = []} = {}) {
   const aliases = frenchNames.filter(([pattern]) => pattern.test(exercise.name)).map(([, words]) => words).join(' ');
   const text = normalize(`${exercise.name} ${exercise.category} ${exercise.muscles.join(' ')} ${exercise.equipmentDetail} ${exercise.mobility ? 'étirements mobilité' : ''} ${aliases}`);
   const terms = normalize(search).split(' ').filter(Boolean);
   return terms.every(term => text.includes(term)) &&
     (!category || exercise.category === category) &&
-    (mobility === 'all' || (mobility === 'only' ? exercise.mobility : !exercise.mobility)) &&
-    (!equipment || (equipment === 'Sans poids' ? exercise.equipment !== 'Avec poids' : exercise.equipment === equipment)) &&
-    (!equipmentGroups.length || equipmentGroups.some(group => exercise.equipmentGroups.includes(group)));
+    (!types.length || types.some(type => exercise.types.includes(type))) &&
+    exercise.equipmentGroups.every(group => group === 'none' || group === 'mat' || equipmentGroups.includes(equipmentFilterFor(group)));
 }
 
 export function generateSession(exercises, minutes, filters = {}) {

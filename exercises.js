@@ -9,6 +9,7 @@ const muscles = {abductors:'Abducteurs',adductors:'Adducteurs',anterior_deltoid:
 const equipmentNames = new Map(EQUIPMENT_GROUPS);
 const weighted = new Set(['barbell','dumbbell','kettlebell','ez_bar','trap_bar','plates','medicine_ball','sandbag']);
 const mobilityExercises = new Set(['bow-pose','dancer-pose','extended-side-angle','downward-dog-to-upward-dog','three-legged-dog','warrior-one','warrior-two']);
+const dynamicMobilityExercises = new Set(['90-90-switch','cat-cow','downward-dog-pedal','downward-dog-to-low-lunge','half-kneeling-hip-flexor-rock','lateral-leg-swing','leg-swing-front-to-back','low-lunge-to-half-split','pilates-roll-down','pilates-saw','pilates-spine-twist','standing-forward-fold-to-half-lift','standing-side-bend-flow','thread-the-needle-flow','torso-twists','worlds-greatest-stretch']);
 const imageBase = 'https://raw.githubusercontent.com/RepDB/exercise-dataset/f12da458a90f353a86c953f204304d5a8bd98275/';
 
 export const exercises = data.map(e => {
@@ -19,6 +20,7 @@ export const exercises = data.map(e => {
   equipmentGroups,
   equipmentDetail:equipmentGroups.map(group => equipmentNames.get(group)).join(' · '),
   muscles:[...new Set(e.muscles.map(m => muscles[m] || m))],
+  types:[...(e.category === 'stretching' ? ['stretching'] : []), ...(mobilityExercises.has(e.id) || dynamicMobilityExercises.has(e.id) ? ['mobility'] : []), ...(!mobilityExercises.has(e.id) && ['strength','plyometrics','olympic'].includes(e.category) ? ['strength'] : [])],
   mobility:e.category === 'stretching' || mobilityExercises.has(e.id),
   movement:e.muscles[0], steps:e.steps, images:[...new Set([e.images.start, e.images.peak, e.images.main].filter(Boolean))].map(path => imageBase + path)
   };

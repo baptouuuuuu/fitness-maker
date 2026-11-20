@@ -34,6 +34,24 @@ export const EQUIPMENT_GROUPS = [
   ['wrist_roller','Rouleau à poignets']
 ];
 
+export const EQUIPMENT_FILTERS = [
+  ['dumbbell','Haltères'], ['kettlebell','Kettlebell'], ['barbell','Barre'],
+  ['flat_bench','Banc'], ['mat','Tapis'], ['ball','Ballon'],
+  ['band','Élastiques'], ['machines','Machines']
+];
+
+const equipmentFilterGroups = {
+  dumbbell:'dumbbell', kettlebell:'kettlebell',
+  barbell:'barbell', ez_bar:'barbell', trap_bar:'barbell',
+  flat_bench:'flat_bench', mat:'mat',
+  medicine_ball:'ball', slam_ball:'ball', stability_ball:'ball', wall_ball:'ball', bosu_ball:'ball',
+  loop_band:'band', resistance_band:'band'
+};
+
+export function equipmentFilterFor(group) {
+  return equipmentFilterGroups[group] || 'machines';
+}
+
 // A mat is optional for sustained contact with the floor, or mentioned explicitly.
 // Standing positions do not acquire a mat merely because the feet touch the floor.
 const matExercises = new Set(`
