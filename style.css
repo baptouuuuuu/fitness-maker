@@ -16,3 +16,16 @@
 .session-item{display:grid;grid-template-columns:auto 140px minmax(0,1fr);gap:10px 16px;align-items:start;background:linear-gradient(135deg,#222a20,#1a1e1b);border-color:#394536;border-radius:14px}
 .session-item .item-number,.session-item .item-image{grid-row:1 / span 2}.session-item .item-image{width:100%;height:90px}.item-main{display:contents}.item-top,.replace-button{grid-column:3}.item-top h3{margin:8px 0}.item-buttons button{border-radius:6px}.item-buttons button:hover:not(:disabled){background:#35412f;color:var(--lime)}.session-item .replace-button{justify-self:start;margin:0;text-align:left}.item-fields{grid-column:1 / -1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:8px}.item-fields label{min-width:0;letter-spacing:.6px}.item-fields .stepper{width:100%}.item-fields .stepper button{flex:0 1 36px;min-width:22px}.item-fields .stepper input{flex:1;width:0;min-width:0}
 @media(max-width:500px){.session-item{grid-template-columns:auto 90px minmax(0,1fr);gap:8px}.session-item .item-image{height:70px}.item-fields{gap:6px}.item-fields label{font-size:9px;letter-spacing:0}.item-fields .stepper button{flex-basis:26px}}
+.equipment-filters .keyword-list{gap:9px}
+.equipment-filters .keyword-list label{display:inline-flex;align-items:center;gap:9px;min-height:40px;padding:8px 13px;border:1px solid #3b4439;border-radius:999px;background:#202520;color:#cbd4c8;transition:background .16s ease,border-color .16s ease,color .16s ease}
+.equipment-filters .keyword-list label:hover{border-color:#78896c;background:#293229}
+.equipment-filters .keyword-list input{appearance:none;display:inline-grid;place-content:center;flex:none;width:17px;height:17px;margin:0;border:1px solid #788574;border-radius:5px;background:#171b17;cursor:pointer;transition:background .16s ease,border-color .16s ease}
+.equipment-filters .keyword-list input::before{content:"";width:8px;height:4px;border:solid #182012;border-width:0 0 2px 2px;transform:rotate(-45deg) translate(1px,-1px);opacity:0}
+.equipment-filters .keyword-list input:checked{border-color:var(--lime);background:var(--lime)}
+.equipment-filters .keyword-list input:checked::before{opacity:1}
+.equipment-filters .keyword-list input:focus-visible{outline:2px solid var(--lime);outline-offset:3px}
+.equipment-filters .keyword-list label:has(input:checked){background:#2c3828;color:#e3f2d5;box-shadow:inset 0 0 0 1px #8aa85e}
+.equipment-filters .keyword-list label:has(input:focus-visible){outline:2px solid var(--lime);outline-offset:3px}
+.session-item{grid-template-columns:auto 152px minmax(0,1fr)}
+.session-item .item-image{height:100px}
+@media(max-width:500px){.session-item{grid-template-columns:auto 100px minmax(0,1fr)}.session-item .item-image{height:76px}}
