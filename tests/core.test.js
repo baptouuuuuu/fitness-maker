@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { exercises, exerciseById, EQUIPMENT_GROUPS } from '../exercises.js';
+import { EQUIPMENT_FILTERS, equipmentFilterFor } from '../equipment-audit.js';
 import data from '../repdb-data.js';
 import { matchesExercise, generateSession, recommend, validateItem, exportSession, importSession, makeTimeline, locatePhase, formatTime } from '../core.js';
 
@@ -61,64 +62,68 @@ test('recommandation exclut les exercices déjà choisis et favorise la variét�
   assert.deepEqual(recommend(catalog,[{exerciseId:'a'}]).map(x => x.exercise.id),['c','b']);
 });
 test('recherche française et anglaise, accents et matériel', () => {
-  const search = term => exercises.filter(exercise => matchesExercise(exercise, {search:term}));
+  const search = term => exercises.filter(exercise => matchesExercise(exercise, {search:term, equipmentGroups:EQUIPMENT_FILTERS.map(([id]) => id)}));
   assert.ok(search('pompes').some(exercise => /push.up/i.test(exercise.name)));
   assert.ok(search('développé couché').some(exercise => /bench press/i.test(exercise.name)));
   assert.ok(search('tractions').some(exercise => /pull.up/i.test(exercise.name)));
   assert.ok(search('push up').some(exercise => /push.up/i.test(exercise.name)));
   assert.ok(search('epaules').length);
-  assert.ok(exercises.filter(exercise => matchesExercise(exercise, {equipment:'Sans matériel'})).every(exercise => exercise.equipmentGroups.includes('none')));
-  assert.ok(exercises.filter(exercise => matchesExercise(exercise, {equipment:'Sans poids'})).every(exercise => exercise.equipment !== 'Avec poids'));
 });
-test('filtres de matériel multiples : union des choix et intersection avec la partie du corps', () => {
-  const filters = {category:'Dos', equipmentGroups:['none','pull_up_bar']};
+test('matériel disponible : tous les équipements nécessaires et intersection avec la partie du corps', () => {
+  const filters = {category:'Dos', equipmentGroups:['dumbbell','flat_bench']};
   const matches = exercises.filter(exercise => matchesExercise(exercise, filters));
   assert.ok(matches.some(exercise => exercise.equipmentGroups.includes('none')));
-  assert.ok(matches.some(exercise => exercise.equipmentGroups.includes('pull_up_bar')));
-  assert.ok(matches.every(exercise => exercise.category === 'Dos' && exercise.equipmentGroups.some(group => filters.equipmentGroups.includes(group))));
-  assert.ok(exerciseById('repdb:pull-up').equipmentGroups.includes('pull_up_bar'));
-  assert.ok(exerciseById('repdb:barbell-box-squat').equipmentGroups.includes('barbell'));
+  assert.ok(matches.some(exercise => exercise.equipmentGroups.includes('dumbbell')));
+  assert.ok(matches.every(exercise => exercise.category === 'Dos' && exercise.equipmentGroups.every(group => ['none','mat'].includes(group) || filters.equipmentGroups.includes(equipmentFilterFor(group)))));
+  const benchPress = exerciseById('repdb:db-bench-press');
+  assert.ok(!matchesExercise(benchPress, {equipmentGroups:['dumbbell']}));
+  assert.ok(matchesExercise(benchPress, {equipmentGroups:['dumbbell','flat_bench']}));
 });
 test('matériels distincts, étiquettes multiples et couverture du catalogue', () => {
   const groups = new Set(EQUIPMENT_GROUPS.map(([id]) => id));
+  const filterGroups = new Set(EQUIPMENT_FILTERS.map(([id]) => id));
   assert.equal(groups.size, EQUIPMENT_GROUPS.length);
+  assert.deepEqual([...filterGroups], ['dumbbell','kettlebell','barbell','flat_bench','mat','ball','band','machines']);
   for (const entry of data) {
     const exercise = exerciseById(`repdb:${entry.id}`);
     assert.ok(exercise.equipmentGroups.length, entry.id);
     assert.ok(exercise.equipmentGroups.every(group => groups.has(group)), entry.id);
+    assert.ok(exercise.equipmentGroups.filter(group => group !== 'none').every(group => filterGroups.has(equipmentFilterFor(group))), entry.id);
     if (entry.equipment) assert.ok(exercise.equipmentGroups.includes(entry.equipment), entry.id);
   }
-  const filter = (id, group) => matchesExercise(exerciseById(`repdb:${id}`), {equipmentGroups:[group]});
-  assert.ok(filter('db-bench-press', 'dumbbell'));
-  assert.ok(!filter('db-bench-press', 'kettlebell'));
-  assert.ok(filter('db-bench-press', 'flat_bench'));
-  assert.ok(filter('kettlebell-swing', 'kettlebell'));
-  assert.ok(!filter('kettlebell-swing', 'dumbbell'));
-  assert.ok(filter('plank', 'mat'));
-  assert.ok(!filter('kettlebell-swing', 'mat'));
-  assert.ok(filter('captains-chair-leg-raise', 'captains_chair'));
-  assert.ok(!filter('captains-chair-leg-raise', 'none'));
-  assert.ok(filter('handstand-push-ups', 'parallettes'));
-  assert.ok(filter('wall-sit', 'wall'));
+  const filter = (id, groups) => matchesExercise(exerciseById(`repdb:${id}`), {equipmentGroups:groups});
+  assert.ok(filter('plank', []));
+  assert.ok(filter('plank', ['mat']));
+  assert.ok(!filter('kettlebell-swing', ['mat']));
+  assert.ok(filter('kettlebell-swing', ['kettlebell']));
+  assert.ok(!filter('captains-chair-leg-raise', []));
+  assert.ok(filter('captains-chair-leg-raise', ['machines']));
+  assert.ok(filter('handstand-push-ups', ['machines']));
+  assert.ok(filter('wall-sit', ['machines']));
+  assert.ok(exercises.filter(exercise => matchesExercise(exercise)).every(exercise => exercise.equipmentGroups.every(group => ['none','mat'].includes(group))));
+  assert.ok(exercises.filter(exercise => matchesExercise(exercise, {equipmentGroups:[]})).every(exercise => exercise.equipmentGroups.every(group => ['none','mat'].includes(group))));
 });
-test('étirements et mobilité : inclusion, exclusion et sélection seule', () => {
+test('types : renforcement, étirement et mobilité combinables', () => {
   const stretch = exerciseById('repdb:childs-pose');
   const mobility = exerciseById('repdb:warrior-one');
   const strength = exerciseById('repdb:push-up');
   assert.ok(stretch.mobility);
   assert.ok(mobility.mobility);
   assert.ok(!strength.mobility);
-  assert.ok(matchesExercise(stretch));
-  assert.ok(!matchesExercise(stretch, {mobility:'exclude'}));
-  assert.ok(matchesExercise(strength, {mobility:'exclude'}));
-  assert.ok(matchesExercise(mobility, {mobility:'only'}));
-  assert.ok(!matchesExercise(strength, {mobility:'only'}));
+  assert.ok(matchesExercise(stretch, {types:['stretching']}));
+  assert.ok(!matchesExercise(stretch, {types:['strength']}));
+  assert.ok(matchesExercise(strength, {types:['strength']}));
+  assert.ok(matchesExercise(mobility, {types:['mobility']}));
+  assert.ok(!matchesExercise(strength, {types:['mobility']}));
+  assert.ok(matchesExercise(strength, {types:['strength','mobility']}));
+  assert.ok(matchesExercise(mobility, {types:['strength','mobility']}));
+  assert.ok(matchesExercise(exerciseById('repdb:cat-cow'), {types:['stretching','mobility']}));
   assert.ok(matchesExercise(stretch, {search:'mobilité'}));
-  assert.ok(generateSession(exercises, 5, {mobility:'only'}).every(item => exerciseById(item.exerciseId).mobility));
-  assert.ok(generateSession(exercises, 5, {mobility:'exclude'}).every(item => !exerciseById(item.exerciseId).mobility));
+  assert.ok(generateSession(exercises, 5, {types:['mobility']}).every(item => exerciseById(item.exerciseId).types.includes('mobility')));
+  assert.ok(generateSession(exercises, 5, {types:['strength']}).every(item => exerciseById(item.exerciseId).types.includes('strength')));
 });
 test('générateur : filtres, durée exacte avec repos et paramètres valides', () => {
-  const filters = {category:'Dos', equipmentGroups:['none','pull_up_bar']};
+  const filters = {category:'Dos', equipmentGroups:['machines']};
   for (const minutes of [5, 20, 120]) {
     const items = generateSession(exercises, minutes, filters);
     assert.ok(items.every(validateItem));
