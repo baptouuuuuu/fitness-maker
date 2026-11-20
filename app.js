@@ -19,12 +19,12 @@ try {
 }
 const validItems = items => Array.isArray(items) && items.every(item => validateItem(item) && byId(item.exerciseId));
 const state = {
-  page:'library', search:'', bodyParts:[], equipmentGroups:['mat'], types:[], sort:'name', onlyFavorites:false, limit:24,
+  page:'library', search:'', bodyParts:[], equipmentGroups:['mat'], types:['strength'], sort:'name', onlyFavorites:false, limit:24,
   favorites:Array.isArray(saved.favorites) ? saved.favorites.filter(id => byId(id)) : [],
   sessions:Array.isArray(saved.sessions) ? saved.sessions.filter(session => session && typeof session.id === 'string' && typeof session.name === 'string' && validItems(session.items)) : [],
   draft:saved.draft && typeof saved.draft.name === 'string' && validItems(saved.draft.items) ? saved.draft : {id:null, name:'Ma séance', items:[]},
   sound:saved.sound !== false, detail:null, runner:null, animationUrl:null, replaceIndex:null,
-  generatorMinutes:'20', generatorFilters:{search:'', bodyParts:[], equipmentGroups:['mat'], types:[]}
+  generatorMinutes:'20', generatorFilters:{search:'', bodyParts:[], equipmentGroups:['mat'], types:['strength']}
 };
 let timerId;
 
@@ -244,7 +244,7 @@ app.addEventListener('click', event => {
     case 'replace':
       if (!state.draft.items[index]) break;
       state.replaceIndex = index;
-      state.search = ''; state.bodyParts = []; state.equipmentGroups = ['mat']; state.types = []; state.onlyFavorites = false; state.limit = 24;
+      state.search = ''; state.bodyParts = []; state.equipmentGroups = ['mat']; state.types = ['strength']; state.onlyFavorites = false; state.limit = 24;
       state.page = 'library'; render(); window.scrollTo(0,0); break;
     case 'replace-auto': {
       if (!validGenerationFilters(state.draft.generationFilters) || !state.draft.items[index]) break;
