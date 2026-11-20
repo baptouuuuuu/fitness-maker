@@ -21,14 +21,27 @@ const frenchNames = [
   [/\b(biceps)\b/i, 'biceps'], [/\b(triceps)\b/i, 'triceps']
 ];
 
-export function matchesExercise(exercise, {search = '', category = '', equipmentGroups = ['mat'], types = []} = {}) {
+export function matchesExercise(exercise, {search = '', category = '', categories = category ? [category] : [], equipmentGroups = ['mat'], types = []} = {}) {
   const aliases = frenchNames.filter(([pattern]) => pattern.test(exercise.name)).map(([, words]) => words).join(' ');
   const text = normalize(`${exercise.name} ${exercise.category} ${exercise.muscles.join(' ')} ${exercise.equipmentDetail} ${exercise.mobility ? 'étirements mobilité' : ''} ${aliases}`);
   const terms = normalize(search).split(' ').filter(Boolean);
   return terms.every(term => text.includes(term)) &&
-    (!category || exercise.category === category) &&
+    (!categories.length || categories.includes(exercise.category)) &&
     (!types.length || types.some(type => exercise.types.includes(type))) &&
     exercise.equipmentGroups.every(group => group === 'none' || group === 'mat' || equipmentGroups.includes(equipmentFilterFor(group)));
+}
+
+export function automaticReplacement(exercises, items, index, filters) {
+  const usedIds = new Set(items.map(item => item.exerciseId));
+  const candidates = exercises.filter(exercise => !usedIds.has(exercise.id) && matchesExercise(exercise, filters));
+  if (!items[index] || !candidates.length) throw new Error('Aucun autre exercice ne correspond aux filtres de cette séance.');
+  return candidates[Math.floor(Math.random() * candidates.length)].id;
+}
+
+export function validGenerationFilters(filters) {
+  return filters && typeof filters === 'object' && !Array.isArray(filters) &&
+    typeof filters.search === 'string' &&
+    ['categories', 'equipmentGroups', 'types'].every(key => Array.isArray(filters[key]) && filters[key].every(value => typeof value === 'string'));
 }
 
 export function generateSession(exercises, minutes, filters = {}) {
@@ -66,7 +79,7 @@ export function validateItem(item) {
 }
 
 export function exportSession(session) {
-  return JSON.stringify({format:'fitness-maker-session', version:1, name:session.name, items:session.items.map(({exerciseId, sets, reps, work, rest}) => ({exerciseId, sets, ...(reps === undefined ? {} : {reps}), work, rest}))}, null, 2);
+  return JSON.stringify({format:'fitness-maker-session', version:1, name:session.name, items:session.items.map(({exerciseId, sets, reps, work, rest}) => ({exerciseId, sets, ...(reps === undefined ? {} : {reps}), work, rest})), ...(validGenerationFilters(session.generationFilters) ? {generationFilters:session.generationFilters} : {})}, null, 2);
 }
 
 export function importSession(text, exerciseById) {
@@ -75,11 +88,12 @@ export function importSession(text, exerciseById) {
   catch { throw new Error('Ce fichier ne contient pas de JSON valide.'); }
   if (!data || typeof data !== 'object' || Array.isArray(data) || data.format !== 'fitness-maker-session' || data.version !== 1 ||
       typeof data.name !== 'string' || !data.name.trim() || data.name.length > 80 ||
-      !Array.isArray(data.items) || !data.items.length || !data.items.every(validateItem)) {
+      !Array.isArray(data.items) || !data.items.length || !data.items.every(validateItem) ||
+      (data.generationFilters !== undefined && !validGenerationFilters(data.generationFilters))) {
     throw new Error('Format de séance invalide ou non pris en charge.');
   }
   if (!data.items.every(item => exerciseById(item.exerciseId))) throw new Error('Cette séance contient des exercices inconnus dans ce catalogue.');
-  return {name:data.name.trim(), items:data.items.map(({exerciseId, sets, reps, work, rest}) => ({exerciseId, sets, ...(reps === undefined ? {} : {reps}), work, rest}))};
+  return {name:data.name.trim(), items:data.items.map(({exerciseId, sets, reps, work, rest}) => ({exerciseId, sets, ...(reps === undefined ? {} : {reps}), work, rest})), ...(data.generationFilters ? {generationFilters:data.generationFilters} : {})};
 }
 
 export function makeTimeline(items) {
