@@ -1,5 +1,5 @@
 import { exercises, exerciseById } from './exercises.js';
-import { STORAGE_KEY, GENERATOR_KEYWORDS, generateSession, recommend, validateItem, exportSession, importSession, makeTimeline, formatTime, locatePhase } from './core.js';
+import { STORAGE_KEY, EQUIPMENT_GROUPS, matchesExercise, generateSession, recommend, validateItem, exportSession, importSession, makeTimeline, formatTime, locatePhase } from './core.js';
 import { getAnimation, saveAnimation, deleteAnimation } from './animations.js';
 
 const app = document.querySelector('#app');
@@ -18,12 +18,12 @@ try {
 }
 const validItems = items => Array.isArray(items) && items.every(item => validateItem(item) && byId(item.exerciseId));
 const state = {
-  page:'library', search:'', category:'Toutes', equipment:'Tous', muscle:'Tous', sort:'name', onlyFavorites:false, limit:24,
+  page:'library', search:'', category:'', equipment:'', equipmentGroups:[], sort:'name', onlyFavorites:false, limit:24,
   favorites:Array.isArray(saved.favorites) ? saved.favorites.filter(id => byId(id)) : [],
   sessions:Array.isArray(saved.sessions) ? saved.sessions.filter(session => session && typeof session.id === 'string' && typeof session.name === 'string' && validItems(session.items)) : [],
   draft:saved.draft && typeof saved.draft.name === 'string' && validItems(saved.draft.items) ? saved.draft : {id:null, name:'Ma séance', items:[]},
   sound:saved.sound !== false, detail:null, runner:null, animationUrl:null, replaceIndex:null,
-  generatorMinutes:'20', generatorText:'', generatorKeywords:[]
+  generatorMinutes:'20', generatorFilters:{search:'', category:'', equipment:'', equipmentGroups:[]}
 };
 let timerId;
 
@@ -72,6 +72,13 @@ function shell(content) {
 function options(values, selected) {
   return values.map(value => `<option ${value === selected ? 'selected' : ''}>${escapeHtml(value)}</option>`).join('');
 }
+function filtersUI(filters, scope) {
+  const categories = [...new Set(exercises.map(exercise => exercise.category))].sort((a,b) => a.localeCompare(b,'fr'));
+  return `<div class="filters"><label class="search"><span aria-hidden="true">⌕</span><input type="search" data-search="${scope}" placeholder="Rechercher en français ou en anglais..." value="${escapeHtml(filters.search)}" aria-label="Rechercher un exercice ou un muscle"></label><label><span class="sr-only">Partie du corps</span><select data-filter="category" data-scope="${scope}"><option value="">Toutes les parties du corps</option>${options(categories, filters.category)}</select></label><label><span class="sr-only">Type de matériel</span><select data-filter="equipment" data-scope="${scope}"><option value="">Tous les types de matériel</option>${options(['Sans matériel','Sans poids','Avec poids','Autre matériel'], filters.equipment)}</select></label></div><fieldset class="equipment-filters"><legend>Matériel disponible <small>— plusieurs choix possibles</small></legend><div class="keyword-list">${EQUIPMENT_GROUPS.map(([value,label]) => `<label><input type="checkbox" data-equipment-group="${scope}" value="${value}" ${filters.equipmentGroups.includes(value) ? 'checked' : ''}> ${label}</label>`).join('')}</div><small>Aucun choix : tout le matériel. Plusieurs choix : exercices utilisant l’un de ces matériels.</small></fieldset>`;
+}
+function itemField(index, field, label, value, min, max, increment) {
+  return `<label>${label}<span class="stepper"><button type="button" data-action="adjust" data-index="${index}" data-field="${field}" data-delta="-${increment}" aria-label="Diminuer ${label.toLowerCase()}" ${value <= min ? 'disabled' : ''}>−</button><input type="number" min="${min}" max="${max}" step="1" data-item="${index}" data-field="${field}" value="${value}" aria-label="${label}"><button type="button" data-action="adjust" data-index="${index}" data-field="${field}" data-delta="${increment}" aria-label="Augmenter ${label.toLowerCase()}" ${value >= max ? 'disabled' : ''}>+</button></span></label>`;
+}
 function exerciseImage(exercise, className) {
   const images = exercise.images || [];
   return `<div class="exercise-images ${className}">${images.length ? images.map((image,index) => `<div class="exercise-image"><img src="${escapeHtml(image)}" alt="${escapeHtml(exercise.name)} : image ${index + 1} sur ${images.length}" loading="lazy"><span>Image indisponible</span></div>`).join('') : '<div class="exercise-image"><span>Image indisponible</span></div>'}</div>`;
@@ -84,20 +91,17 @@ function library() {
   const ranked = recommend(exercises, state.draft.items);
   const rank = new Map(ranked.map((entry,index) => [entry.exercise.id,{...entry,index}]));
   const filtered = exercises.filter(exercise => {
-    const text = `${exercise.name} ${exercise.muscles.join(' ')} ${exercise.category}`.toLocaleLowerCase('fr');
-    return text.includes(state.search.toLocaleLowerCase('fr').trim()) && (state.category === 'Toutes' || exercise.category === state.category) && (state.equipment === 'Tous' || exercise.equipment === state.equipment) && (state.muscle === 'Tous' || exercise.muscles.includes(state.muscle)) && (!state.onlyFavorites || state.favorites.includes(exercise.id));
+    return matchesExercise(exercise, state) && (!state.onlyFavorites || state.favorites.includes(exercise.id));
   }).sort((a,b) => state.sort === 'relevance' ? (rank.get(a.id)?.index ?? 999) - (rank.get(b.id)?.index ?? 999) || a.name.localeCompare(b.name,'fr') : a.name.localeCompare(b.name,'fr'));
-  const muscles = [...new Set(exercises.flatMap(e => e.muscles))].sort((a,b) => a.localeCompare(b,'fr'));
-  return `<div class="eyebrow"><span></span> VOTRE ENTRAÎNEMENT COMMENCE ICI</div><div class="heading-row"><div><h1>Trouvez votre <em>mouvement.</em></h1><p class="intro">Explorez les exercices, composez une séance qui vous ressemble et avancez à votre rythme.</p></div><button class="primary heading-cta" data-page="session">Ma séance <span>↗</span></button></div>${state.replaceIndex !== null ? `<div class="panel replace-banner"><div><strong>Remplacer ${escapeHtml(byId(state.draft.items[state.replaceIndex].exerciseId).name)}</strong><p>Choisissez un exercice ; les séries et les temps seront conservés.</p></div><button class="secondary" data-action="cancel-replace">Annuler</button></div>` : ''}<section class="library-section"><div class="section-heading"><div><div class="eyebrow muted">LA COLLECTION</div><h2>Bibliothèque <span class="count">${filtered.length}</span></h2></div><button class="filter-fav ${state.onlyFavorites ? 'selected' : ''}" data-action="filter-favorites" aria-pressed="${state.onlyFavorites}">♡ Favoris</button></div><div class="filters"><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Rechercher (noms en anglais) ou muscle..." value="${escapeHtml(state.search)}" aria-label="Rechercher un exercice ou un muscle"></label><label><span class="sr-only">Catégorie</span><select data-filter="category">${options(['Toutes',...new Set(exercises.map(e => e.category))],state.category)}</select></label><label><span class="sr-only">Matériel</span><select data-filter="equipment">${options(['Tous','Sans poids','Avec poids','Autre matériel'],state.equipment)}</select></label><label><span class="sr-only">Muscle</span><select data-filter="muscle">${options(['Tous',...muscles],state.muscle)}</select></label><label><span class="sr-only">Trier par</span><select data-filter="sort"><option value="name" ${state.sort === 'name' ? 'selected' : ''}>Nom</option><option value="relevance" ${state.sort === 'relevance' ? 'selected' : ''}>Pertinence</option></select></label></div><div class="results-line"><span>${filtered.length} exercice${filtered.length > 1 ? 's' : ''} à découvrir</span><span>FAITES-VOUS PLAISIR ✳</span></div><div class="cards">${filtered.slice(0,state.limit).map(e => card(e,rank.get(e.id) || {reason:'Déjà dans votre séance'})).join('')}</div>${filtered.length > state.limit ? `<button class="secondary load-more" data-action="more">Afficher plus (${Math.min(state.limit,filtered.length)} / ${filtered.length})</button>` : ''}${filtered.length ? '' : '<div class="empty">Aucun exercice ne correspond à ces filtres.</div>'}</section>`;
+  return `<div class="eyebrow"><span></span> VOTRE ENTRAÎNEMENT COMMENCE ICI</div><div class="heading-row"><div><h1>Trouvez votre <em>mouvement.</em></h1><p class="intro">Explorez les exercices, composez une séance qui vous ressemble et avancez à votre rythme.</p></div><button class="primary heading-cta" data-page="session">Ma séance <span>↗</span></button></div>${state.replaceIndex !== null ? `<div class="panel replace-banner"><div><strong>Remplacer ${escapeHtml(byId(state.draft.items[state.replaceIndex].exerciseId).name)}</strong><p>Choisissez un exercice ; les séries et les temps seront conservés.</p></div><button class="secondary" data-action="cancel-replace">Annuler</button></div>` : ''}<section class="library-section"><div class="section-heading"><div><div class="eyebrow muted">LA COLLECTION</div><h2>Bibliothèque <span class="count">${filtered.length}</span></h2></div><button class="filter-fav ${state.onlyFavorites ? 'selected' : ''}" data-action="filter-favorites" aria-pressed="${state.onlyFavorites}">♡ Favoris</button></div>${filtersUI(state, 'library')}<div class="filters sort-filter"><label><span class="sr-only">Trier par</span><select data-filter="sort" data-scope="library"><option value="name" ${state.sort === 'name' ? 'selected' : ''}>Trier par nom</option><option value="relevance" ${state.sort === 'relevance' ? 'selected' : ''}>Trier par pertinence</option></select></label></div><div class="results-line"><span>${filtered.length} exercice${filtered.length > 1 ? 's' : ''} à découvrir</span><span>FAITES-VOUS PLAISIR ✳</span></div><div class="cards">${filtered.slice(0,state.limit).map(e => card(e,rank.get(e.id) || {reason:'Déjà dans votre séance'})).join('')}</div>${filtered.length > state.limit ? `<button class="secondary load-more" data-action="more">Afficher plus (${Math.min(state.limit,filtered.length)} / ${filtered.length})</button>` : ''}${filtered.length ? '' : '<div class="empty">Aucun exercice ne correspond à ces filtres.</div>'}</section>`;
 }
 function sessionPage() {
   const items = state.draft.items;
   const total = makeTimeline(items).reduce((sum, phase) => sum + phase.duration, 0);
-  const suggestions = recommend(exercises,items).slice(0,3);
-  return `<div class="eyebrow"><span></span> VOTRE PROGRAMME</div><div class="heading-row"><div><h1>À vous de <em>jouer.</em></h1><p class="intro">Composez votre séance, ajustez vos temps et lancez-vous.</p></div><button class="secondary" data-action="new">＋ Nouvelle séance</button></div><section class="session-layout"><div><div class="panel session-header"><label for="session-name">NOM DE LA SÉANCE</label><input id="session-name" maxlength="80" value="${escapeHtml(state.draft.name)}" placeholder="Donnez un nom à votre séance"><div class="session-stats"><span><strong>${items.length}</strong> exercice${items.length > 1 ? 's' : ''}</span><span><strong>${formatTime(total)}</strong> durée estimée</span></div></div><div class="section-heading session-title"><h2>Votre séance <span class="count">${items.length}</span></h2><button class="text-button" data-page="library">＋ Ajouter des exercices</button></div>${items.length ? items.map((item,index) => {const e=byId(item.exerciseId); return `<article class="session-item"><div class="item-number">${String(index+1).padStart(2,'0')}</div>${exerciseImage(e,'item-image')}<div class="item-main"><div class="item-top"><div><div class="card-kicker">${e.category} · ${e.equipment}</div><h3>${e.name}</h3></div><div class="item-buttons"><button data-action="move-up" data-index="${index}" aria-label="Monter ${e.name}" ${index === 0 ? 'disabled' : ''}>↑</button><button data-action="move-down" data-index="${index}" aria-label="Descendre ${e.name}" ${index === items.length-1 ? 'disabled' : ''}>↓</button><button data-action="remove" data-index="${index}" aria-label="Retirer ${e.name}">×</button></div></div><button class="text-button replace-button" data-action="replace" data-index="${index}">↺ Remplacer cet exercice</button><div class="item-fields"><label>SÉRIES<input type="number" min="1" max="10" step="1" data-item="${index}" data-field="sets" value="${item.sets}"></label><label>EFFORT (SEC)<input type="number" min="5" max="600" step="1" data-item="${index}" data-field="work" value="${item.work}"></label><label>REPOS (SEC)<input type="number" min="0" max="300" step="1" data-item="${index}" data-field="rest" value="${item.rest}"></label></div></div></article>`;}).join('') : '<div class="empty"><strong>Votre séance prend forme ici.</strong><p>Choisissez vos premiers exercices dans la bibliothèque.</p><button class="secondary" data-page="library">Explorer les exercices ↗</button></div>'}</div><aside class="session-aside"><div class="panel launch-panel"><div class="eyebrow muted">PRÊT QUAND VOUS L’ÊTES</div><h2>On se lance ?</h2><p>Votre chronomètre vous accompagne à chaque étape.</p><button class="primary full" data-action="start" ${items.length ? '' : 'disabled'}>▶ &nbsp; Démarrer la séance</button><button class="secondary full" data-action="save" ${items.length ? '' : 'disabled'}>♡ &nbsp; Enregistrer la séance</button><button class="secondary full" data-action="export-draft" ${items.length ? '' : 'disabled'}>Exporter en JSON</button></div><div class="panel suggestion-panel"><div class="eyebrow muted">POUR ALLER PLUS LOIN</div><h2>À essayer <span>✦</span></h2><p>Des idées pour varier votre séance.</p>${suggestions.map(({exercise,reason}) => `<div class="suggestion"><div><strong>${exercise.name}</strong><small>${reason}</small></div><button class="add-button" data-action="add" data-id="${exercise.id}" aria-label="Ajouter ${exercise.name}">+</button></div>`).join('')}</div></aside></section>`;
+  return `<div class="eyebrow"><span></span> VOTRE PROGRAMME</div><div class="heading-row"><div><h1>À vous de <em>jouer.</em></h1><p class="intro">Composez votre séance, ajustez vos temps et lancez-vous.</p></div><button class="secondary" data-action="new">＋ Nouvelle séance</button></div><section class="session-layout"><div><div class="section-heading session-title"><h2>Votre séance <span class="count">${items.length}</span></h2><button class="text-button" data-page="library">＋ Ajouter des exercices</button></div>${items.length ? items.map((item,index) => {const e=byId(item.exerciseId); return `<article class="session-item"><div class="item-number">${String(index+1).padStart(2,'0')}</div>${exerciseImage(e,'item-image')}<div class="item-main"><div class="item-top"><div><div class="card-kicker">${e.category} · ${e.equipment}</div><h3>${e.name}</h3></div><div class="item-buttons"><button data-action="move-up" data-index="${index}" aria-label="Monter ${e.name}" ${index === 0 ? 'disabled' : ''}>↑</button><button data-action="move-down" data-index="${index}" aria-label="Descendre ${e.name}" ${index === items.length-1 ? 'disabled' : ''}>↓</button><button data-action="remove" data-index="${index}" aria-label="Retirer ${e.name}">×</button></div></div><button class="text-button replace-button" data-action="replace" data-index="${index}">↺ Remplacer cet exercice</button><div class="item-fields">${itemField(index,'sets','SÉRIES',item.sets,1,10,1)}${itemField(index,'reps','RÉPÉTITIONS (0 = LIBRE)',item.reps ?? 0,0,999,1)}${itemField(index,'work','EFFORT (SEC)',item.work,5,600,10)}${itemField(index,'rest','REPOS (SEC)',item.rest,0,300,10)}</div></div></article>`;}).join('') : '<div class="empty"><strong>Votre séance prend forme ici.</strong><p>Choisissez vos premiers exercices dans la bibliothèque.</p><button class="secondary" data-page="library">Explorer les exercices ↗</button></div>'}</div><aside class="session-aside"><div class="panel launch-panel"><div class="session-header"><label for="session-name">NOM DE LA SÉANCE</label><input id="session-name" maxlength="80" value="${escapeHtml(state.draft.name)}" placeholder="Donnez un nom à votre séance"><div class="session-stats"><span><strong>${items.length}</strong> exercice${items.length > 1 ? 's' : ''}</span><span><strong>${formatTime(total)}</strong> durée estimée</span></div></div><div class="eyebrow muted">PRÊT QUAND VOUS L’ÊTES</div><h2>On se lance ?</h2><p>Votre chronomètre vous accompagne à chaque étape.</p><button class="primary full" data-action="start" ${items.length ? '' : 'disabled'}>▶ &nbsp; Démarrer la séance</button><button class="secondary full" data-action="save" ${items.length ? '' : 'disabled'}>♡ &nbsp; Enregistrer la séance</button><button class="secondary full" data-action="export-draft" ${items.length ? '' : 'disabled'}>Exporter en JSON</button></div></aside></section>`;
 }
 function generatorForm() {
-  return `<form class="panel generator" id="generator"><div class="eyebrow muted">VOTRE SÉANCE SUR MESURE</div><h2>Générer une séance ✦</h2><p>Choisissez une durée, repos compris, et vos objectifs. Vérifiez le matériel et adaptez les exercices à votre niveau.</p><div class="generator-fields"><label>Durée totale (minutes)<input id="generator-minutes" type="number" min="5" max="120" step="1" required value="${escapeHtml(state.generatorMinutes)}"></label><label>Autres mots-clés<input id="generator-text" type="text" value="${escapeHtml(state.generatorText)}" placeholder="Ex. squat, biceps, pull up"></label></div><p>Séparez les mots-clés par des virgules ; les noms d’exercices sont en anglais.</p><fieldset><legend>Mots-clés proposés</legend><div class="keyword-list">${GENERATOR_KEYWORDS.map(keyword => `<label><input type="checkbox" name="keyword" value="${keyword}" ${state.generatorKeywords.includes(keyword) ? 'checked' : ''}> ${keyword}</label>`).join('')}</div></fieldset><button class="primary" type="submit">Générer ma séance ↗</button></form>`;
+  return `<form class="panel generator" id="generator"><div class="eyebrow muted">VOTRE SÉANCE SUR MESURE</div><h2>Générer une séance ✦</h2><p>Choisissez une durée, repos compris, et filtrez les exercices. Adaptez la séance à votre niveau.</p><div class="generator-fields"><label>Durée totale (minutes)<input id="generator-minutes" type="number" min="5" max="120" step="1" required value="${escapeHtml(state.generatorMinutes)}"></label></div>${filtersUI(state.generatorFilters, 'generator')}<button class="primary" type="submit">Générer ma séance ↗</button></form>`;
 }
 function generatorPage() {
   return `<div class="eyebrow"><span></span> SÉANCE AUTOMATIQUE</div><div class="heading-row"><div><h1>Une séance <em>sur mesure.</em></h1><p class="intro">Choisissez vos objectifs, puis personnalisez votre séance avant de commencer.</p></div><button class="secondary" data-page="session">Retour à ma séance</button></div>${generatorForm()}`;
@@ -118,7 +122,7 @@ function runnerModal() {
   const total = runner.timeline.reduce((sum, item) => sum + item.duration, 0);
   const elapsed = done ? total : runner.timeline.slice(0,runner.index).reduce((sum, item) => sum + item.duration, 0) + phase.duration - runner.remaining;
   const upcoming = phase ? runner.items.slice(phase.itemIndex + 1) : [];
-  return `<div class="overlay runner-overlay"><section class="modal runner" role="dialog" aria-modal="true" aria-labelledby="runner-title"><button class="close" data-action="stop" aria-label="Fermer le chronomètre">×</button><div class="eyebrow"><span></span> ${done ? 'SÉANCE TERMINÉE' : phase.type === 'work' ? 'C’EST À VOUS' : 'REPRENEZ VOTRE SOUFFLE'}</div><h2 id="runner-title">${done ? 'Bravo, vous l’avez fait !' : phase.type === 'work' ? escapeHtml(exercise.name) : 'Temps de repos'}</h2><p>${done ? 'Chaque mouvement compte. À bientôt !' : phase.type === 'work' ? `Série ${phase.set} sur ${phase.sets}` : next ? `À suivre : ${escapeHtml(byId(next.exerciseId).name)} · série ${next.set}/${next.sets}` : ''}</p>${exercise ? `<div class="runner-current">${exerciseImage(exercise,'runner-image')}<strong>${escapeHtml(exercise.name)}</strong></div>` : ''}<div class="timer-ring ${phase?.type === 'rest' ? 'rest' : ''}"><span id="timer-display" role="timer">${formatTime(runner.remaining)}</span><small>${done ? 'BIEN JOUÉ' : runner.paused ? 'EN PAUSE' : phase.type === 'work' ? 'EFFORT' : 'REPOS'}</small></div><div class="runner-progress"><label for="session-progress">Progression de la séance ${done ? '· terminée' : `· exercice ${phase.itemIndex + 1} / ${runner.items.length}`}</label><progress id="session-progress" max="${total}" value="${elapsed}"></progress><small>Étape ${done ? runner.timeline.length : runner.index + 1} / ${runner.timeline.length}</small></div>${done ? '<button class="primary" data-action="stop">Terminer</button>' : `<div class="runner-actions"><button class="secondary" data-action="pause">${runner.paused ? '▶ Reprendre' : 'Ⅱ Pause'}</button><button class="text-button" data-action="skip">Passer ↗</button></div>${upcoming.length ? `<div class="runner-upcoming"><h3>Exercices suivants</h3><div class="upcoming-list">${upcoming.map(item => { const e = byId(item.exerciseId); return `<div class="upcoming-item">${exerciseImage(e,'upcoming-image')}<span>${escapeHtml(e.name)}</span></div>`; }).join('')}</div></div>` : ''}`}</section></div>`;
+  return `<div class="overlay runner-overlay"><section class="modal runner" role="dialog" aria-modal="true" aria-labelledby="runner-title"><button class="close" data-action="stop" aria-label="Fermer le chronomètre">×</button><div class="eyebrow"><span></span> ${done ? 'SÉANCE TERMINÉE' : phase.type === 'work' ? 'C’EST À VOUS' : 'REPRENEZ VOTRE SOUFFLE'}</div><h2 id="runner-title">${done ? 'Bravo, vous l’avez fait !' : phase.type === 'work' ? escapeHtml(exercise.name) : 'Temps de repos'}</h2><p>${done ? 'Chaque mouvement compte. À bientôt !' : phase.type === 'work' ? `Série ${phase.set} sur ${phase.sets}${runner.items[phase.itemIndex].reps ? ` · objectif : ${runner.items[phase.itemIndex].reps} répétition${runner.items[phase.itemIndex].reps > 1 ? 's' : ''}` : ''}` : next ? `À suivre : ${escapeHtml(byId(next.exerciseId).name)} · série ${next.set}/${next.sets}` : ''}</p>${exercise ? `<div class="runner-current">${exerciseImage(exercise,'runner-image')}<strong>${escapeHtml(exercise.name)}</strong></div>` : ''}<div class="timer-ring ${phase?.type === 'rest' ? 'rest' : ''}"><span id="timer-display" role="timer">${formatTime(runner.remaining)}</span><small>${done ? 'BIEN JOUÉ' : runner.paused ? 'EN PAUSE' : phase.type === 'work' ? 'EFFORT' : 'REPOS'}</small></div><div class="runner-progress"><label for="session-progress">Progression de la séance ${done ? '· terminée' : `· exercice ${phase.itemIndex + 1} / ${runner.items.length}`}</label><progress id="session-progress" max="${total}" value="${elapsed}"></progress><small>Étape ${done ? runner.timeline.length : runner.index + 1} / ${runner.timeline.length}</small></div>${done ? '<button class="primary" data-action="stop">Terminer</button>' : `<div class="runner-actions"><button class="secondary" data-action="pause">${runner.paused ? '▶ Reprendre' : 'Ⅱ Pause'}</button><button class="text-button" data-action="skip">Passer ↗</button></div>${upcoming.length ? `<div class="runner-upcoming"><h3>Exercices suivants</h3><div class="upcoming-list">${upcoming.map(item => { const e = byId(item.exerciseId); return `<div class="upcoming-item">${exerciseImage(e,'upcoming-image')}<span>${escapeHtml(e.name)}</span></div>`; }).join('')}</div></div>` : ''}`}</section></div>`;
 }
 function render() {
   app.innerHTML = shell(state.page === 'library' ? library() : state.page === 'session' ? sessionPage() : state.page === 'generator' ? generatorPage() : savedPage());
@@ -132,7 +136,7 @@ function add(id) {
     state.replaceIndex = null;
     state.page = 'session';
   } else {
-    state.draft.items.push({exerciseId:id,sets:3,work:40,rest:20});
+    state.draft.items.push({exerciseId:id,sets:3,reps:0,work:40,rest:20});
   }
   state.detail = null;
   clearAnimation();
@@ -232,9 +236,18 @@ app.addEventListener('click', event => {
     case 'replace':
       if (!state.draft.items[index]) break;
       state.replaceIndex = index;
-      state.search = ''; state.category = 'Toutes'; state.equipment = 'Tous'; state.muscle = 'Tous'; state.onlyFavorites = false; state.limit = 24;
+      state.search = ''; state.category = ''; state.equipment = ''; state.equipmentGroups = []; state.onlyFavorites = false; state.limit = 24;
       state.page = 'library'; render(); window.scrollTo(0,0); break;
     case 'cancel-replace': state.replaceIndex = null; state.page = 'session'; state.detail = null; clearAnimation(); render(); break;
+    case 'adjust': {
+      const item = state.draft.items[index];
+      const field = button.dataset.field;
+      const bounds = {sets:[1,10], reps:[0,999], work:[5,600], rest:[0,300]};
+      if (!item || !bounds[field]) break;
+      const [min,max] = bounds[field];
+      item[field] = Math.max(min, Math.min(max, (item[field] ?? 0) + Number(button.dataset.delta)));
+      persist(); render(); break;
+    }
     case 'remove': state.draft.items.splice(index,1); persist(); render(); break;
     case 'move-up': case 'move-down': {
       const target = index + (action === 'move-up' ? -1 : 1);
@@ -278,21 +291,21 @@ app.addEventListener('click', event => {
   }
 });
 app.addEventListener('input', event => {
-  if (event.target.id === 'search') {
-    state.search = event.target.value; state.limit = 24;
+  if (event.target.dataset.search) {
+    const scope = event.target.dataset.search;
+    const filters = scope === 'generator' ? state.generatorFilters : state;
+    filters.search = event.target.value; state.limit = 24;
     const position = event.target.selectionStart;
     render();
-    const input = document.querySelector('#search'); input.focus(); input.setSelectionRange(position,position);
+    const input = document.querySelector(`[data-search="${scope}"]`); input.focus(); input.setSelectionRange(position,position);
   } else if (event.target.id === 'session-name') { state.draft.name = event.target.value; persist(); }
   else if (event.target.id === 'generator-minutes') state.generatorMinutes = event.target.value;
-  else if (event.target.id === 'generator-text') state.generatorText = event.target.value;
 });
 app.addEventListener('submit', event => {
   if (event.target.id !== 'generator') return;
   event.preventDefault();
-  const keywords = [...state.generatorKeywords, ...state.generatorText.split(/[,;]+/)];
   let items;
-  try { items = generateSession(exercises, Number(state.generatorMinutes), keywords); }
+  try { items = generateSession(exercises, Number(state.generatorMinutes), state.generatorFilters); }
   catch (error) { notify(error.message); return; }
   if (state.draft.items.length && !confirm('Remplacer la séance actuelle ? Les modifications non enregistrées seront perdues.')) return;
   state.draft = {id:null, name:'Séance générée', items};
@@ -308,8 +321,10 @@ app.addEventListener('change', event => {
     loadSessionFile(file);
     return;
   }
-  if (target.name === 'keyword') {
-    state.generatorKeywords = target.checked ? [...state.generatorKeywords, target.value] : state.generatorKeywords.filter(keyword => keyword !== target.value);
+  if (target.dataset.equipmentGroup) {
+    const filters = target.dataset.equipmentGroup === 'generator' ? state.generatorFilters : state;
+    filters.equipmentGroups = target.checked ? [...filters.equipmentGroups, target.value] : filters.equipmentGroups.filter(group => group !== target.value);
+    state.limit = 24; render(); return;
   }
   if (target.id === 'animation-file' && target.files.length) {
     const file = target.files[0];
@@ -319,7 +334,7 @@ app.addEventListener('change', event => {
       if (state.detail === exerciseId) { clearAnimation(); state.animationUrl = URL.createObjectURL(file); render(); }
     }).catch(() => notify('Impossible d’enregistrer cette animation : stockage indisponible ou plein.'));
   }
-  if (target.dataset.filter) { state[target.dataset.filter] = target.value; state.limit = 24; render(); }
+  if (target.dataset.filter) { const filters = target.dataset.scope === 'generator' ? state.generatorFilters : state; filters[target.dataset.filter] = target.value; state.limit = 24; render(); }
   if (target.dataset.item !== undefined) {
     const item = state.draft.items[Number(target.dataset.item)];
     const field = target.dataset.field;
@@ -327,7 +342,7 @@ app.addEventListener('change', event => {
     const candidate = {...item,[field]:value};
     if (!target.value || !validateItem(candidate)) {
       target.value = item[field];
-      notify('Valeurs autorisées : 1 à 10 séries, 5 à 600 secondes d’effort et 0 à 300 secondes de repos.');
+      notify('Valeurs autorisées : 1 à 10 séries, 0 à 999 répétitions, 5 à 600 secondes d’effort et 0 à 300 secondes de repos.');
     } else { item[field] = value; persist(); render(); }
   }
 });
