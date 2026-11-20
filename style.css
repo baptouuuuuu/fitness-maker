@@ -87,3 +87,20 @@
 .item-fields .stepper button{width:38px;flex:none}
 .item-fields .stepper input{width:54px}
 @media(max-width:600px){.session-item{padding:14px}.item-heading{grid-template-columns:32px minmax(104px,118px) minmax(0,1fr);gap:10px}.item-number{width:32px;height:32px}.session-item .item-image{height:100px}.item-title .card-kicker{font-size:9px}.item-title h3{font-size:14px}.item-buttons{grid-column:1/-1;justify-self:start}.item-replacements{flex-direction:row}.item-replacements .replace-button{width:auto}.session-item .item-fields{gap:8px}.item-fields label{font-size:9px;letter-spacing:0}.item-fields .stepper{width:100%}.item-fields .stepper button{flex:1;min-width:28px}.item-fields .stepper input{flex:1;width:0;min-width:30px}}
+.session-item{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px 20px;align-items:start}
+.session-item .item-heading,.session-item .item-main{display:contents}
+.item-heading>.item-number{grid-column:2;grid-row:1}
+.item-heading>.item-image{grid-column:1;grid-row:1 / span 4}
+.session-item .item-image{display:flex;flex-direction:column;width:100%;height:100%;min-height:360px;gap:4px}
+.item-image .exercise-image{flex:1 1 0;min-height:0}
+.item-title{grid-column:2;grid-row:2;min-width:0;overflow-wrap:anywhere}
+.item-buttons{grid-column:2;grid-row:1;justify-self:end}
+.item-replacements{grid-column:2;grid-row:3;display:flex;flex-direction:column;align-items:stretch;margin:0}
+.item-replacements .replace-button{width:100%;white-space:normal}
+.item-replacements .primary.replace-button{color:#192312}
+.session-item .item-fields{grid-column:2;grid-row:4;display:grid;grid-template-columns:1fr;gap:10px}
+.item-fields .stepper{width:100%;max-width:180px}
+.item-fields .stepper button{flex:1;min-height:36px}
+.item-fields .stepper input{flex:1;min-width:0}
+@media(max-width:600px){.session-item{gap:10px;padding:12px}.session-item .item-image{min-height:360px}.item-buttons{grid-column:2;justify-self:end;gap:4px}.item-buttons button{width:32px;height:36px}.item-replacements{flex-direction:column}.item-replacements .replace-button{width:100%;padding:10px 6px;font-size:11px}.session-item .item-fields{gap:8px}.item-fields .stepper button{min-width:24px}.item-fields .stepper input{min-width:25px}}
+@media(max-width:360px){.item-number{width:28px;height:32px}.item-buttons{gap:2px}.item-buttons button{width:28px}}
