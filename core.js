@@ -2,12 +2,6 @@ export const STORAGE_KEY = 'fitness-maker-v1';
 
 const normalize = text => text.toLocaleLowerCase('fr').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
-export const EQUIPMENT_GROUPS = [
-  ['none', 'Sans matériel'], ['dumbbells', 'Haltères / kettlebells'],
-  ['barbell', 'Barres et haltères longs'], ['station', 'Barre fixe / dips / anneaux'],
-  ['machine', 'Machines / poulies'], ['other', 'Autre matériel']
-];
-
 const frenchNames = [
   [/\bpush[ -]?ups?\b/i, 'pompe pompes'], [/\b(pull[ -]?ups?|chin[ -]?ups?)\b/i, 'traction tractions'],
   [/\bsquats?\b/i, 'squat flexion jambes'], [/\blunges?\b/i, 'fente fentes'],
@@ -25,14 +19,15 @@ const frenchNames = [
   [/\b(biceps)\b/i, 'biceps'], [/\b(triceps)\b/i, 'triceps']
 ];
 
-export function matchesExercise(exercise, {search = '', category = '', equipment = '', equipmentGroups = []} = {}) {
+export function matchesExercise(exercise, {search = '', category = '', equipment = '', equipmentGroups = [], mobility = 'all'} = {}) {
   const aliases = frenchNames.filter(([pattern]) => pattern.test(exercise.name)).map(([, words]) => words).join(' ');
-  const text = normalize(`${exercise.name} ${exercise.category} ${exercise.muscles.join(' ')} ${exercise.equipmentDetail} ${aliases}`);
+  const text = normalize(`${exercise.name} ${exercise.category} ${exercise.muscles.join(' ')} ${exercise.equipmentDetail} ${exercise.mobility ? 'étirements mobilité' : ''} ${aliases}`);
   const terms = normalize(search).split(' ').filter(Boolean);
   return terms.every(term => text.includes(term)) &&
     (!category || exercise.category === category) &&
+    (mobility === 'all' || (mobility === 'only' ? exercise.mobility : !exercise.mobility)) &&
     (!equipment || (equipment === 'Sans poids' ? exercise.equipment !== 'Avec poids' : exercise.equipment === equipment)) &&
-    (!equipmentGroups.length || equipmentGroups.includes(exercise.equipmentGroup));
+    (!equipmentGroups.length || equipmentGroups.some(group => exercise.equipmentGroups.includes(group)));
 }
 
 export function generateSession(exercises, minutes, filters = {}) {
@@ -44,10 +39,10 @@ export function generateSession(exercises, minutes, filters = {}) {
   const slots = Math.min(minutes, Math.ceil((minutes - 1) / 3) + 1);
   while (remaining > 0) {
     const sets = Math.min(3, remaining - (slots - items.length - 2));
-    items.push({exerciseId:matches[items.length % matches.length].id, sets, reps:0, work:40, rest:20});
+    items.push({exerciseId:matches[items.length % matches.length].id, sets, work:40, rest:20});
     remaining -= sets;
   }
-  items.push({exerciseId:matches[items.length % matches.length].id, sets:1, reps:0, work:60, rest:20});
+  items.push({exerciseId:matches[items.length % matches.length].id, sets:1, work:60, rest:20});
   return items;
 }
 
