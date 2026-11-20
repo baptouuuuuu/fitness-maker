@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { exercises, exerciseById, EQUIPMENT_GROUPS } from '../exercises.js';
 import { EQUIPMENT_FILTERS, equipmentFilterFor } from '../equipment-audit.js';
 import data from '../repdb-data.js';
-import { matchesExercise, generateSession, automaticReplacement, recommend, validateItem, exportSession, importSession, makeTimeline, locatePhase, formatTime } from '../core.js';
+import { BODY_PART_FILTERS, matchesExercise, generateSession, automaticReplacement, recommend, validateItem, exportSession, importSession, makeTimeline, locatePhase, formatTime } from '../core.js';
 
 test('catalogue RepDB complet et séances précédentes conservées', () => {
   assert.equal(exercises.length, 708);
@@ -150,8 +150,20 @@ test('parties du corps combinées dans les filtres et la génération', () => {
   assert.ok(matchesExercise(exerciseById('repdb:push-up'), {categories:[]}));
   assert.ok(!matchesExercise(exerciseById('repdb:push-up'), {categories:['Dos']}));
 });
+test('filtres dédiés aux parties du corps couvrent les zones demandées', () => {
+  assert.deepEqual(BODY_PART_FILTERS.map(part => part.label), ['Dos','Abdos','Fessiers','Mollets','Cuisses','Bras','Épaules','Pecs']);
+  for (const {id,label} of BODY_PART_FILTERS) {
+    assert.ok(exercises.some(exercise => matchesExercise(exercise, {bodyParts:[id]})), `Aucun exercice trouvé pour ${label}`);
+  }
+  const glutes = exercises.filter(exercise => matchesExercise(exercise, {bodyParts:['glutes']}));
+  assert.ok(glutes.every(exercise => exercise.muscles.includes('Fessiers')));
+  const selected = exercises.filter(exercise => matchesExercise(exercise, {bodyParts:['glutes','calves']}));
+  assert.ok(selected.some(exercise => exercise.muscles.includes('Fessiers')));
+  assert.ok(selected.some(exercise => exercise.muscles.includes('Mollets')));
+  assert.ok(selected.every(exercise => exercise.muscles.includes('Fessiers') || exercise.muscles.includes('Mollets')));
+});
 test('remplacement automatique respecte les filtres et exclut les exercices de la séance', () => {
-  const filters = {search:'', categories:['Dos'], types:['strength'], equipmentGroups:['machines']};
+  const filters = {search:'', bodyParts:['back'], types:['strength'], equipmentGroups:['machines']};
   const eligible = exercises.filter(exercise => matchesExercise(exercise, filters));
   assert.ok(eligible.length >= 3);
   const items = eligible.slice(0, 2).map(exercise => ({exerciseId:exercise.id, sets:2, work:30, rest:10}));
@@ -163,10 +175,12 @@ test('remplacement automatique respecte les filtres et exclut les exercices de l
   assert.throws(() => automaticReplacement(eligible.slice(0, 2), items, 0, filters), /Aucun autre exercice/);
 });
 test('les filtres de génération survivent à un export et import, les anciens fichiers restent valides', () => {
-  const filters = {search:'pompes', categories:['Dos','Jambes'], equipmentGroups:[], types:['strength']};
+  const filters = {search:'pompes', bodyParts:['back','thighs'], equipmentGroups:[], types:['strength']};
   const session = {name:'Séance', items:[{exerciseId:'0001', sets:1, work:30, rest:0}], generationFilters:filters};
   assert.deepEqual(importSession(exportSession(session), exerciseById), session);
   const malformed = JSON.parse(exportSession(session));
-  malformed.generationFilters.categories = 'Dos';
+  malformed.generationFilters.bodyParts = ['unknown'];
   assert.throws(() => importSession(JSON.stringify(malformed), exerciseById), /invalide/);
+  const legacySession = {...session,generationFilters:{search:'',categories:['Dos'],equipmentGroups:[],types:[]}};
+  assert.deepEqual(importSession(exportSession(legacySession), exerciseById), legacySession);
 });

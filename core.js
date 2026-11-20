@@ -2,6 +2,17 @@ import { equipmentFilterFor } from './equipment-audit.js';
 
 export const STORAGE_KEY = 'fitness-maker-v1';
 
+export const BODY_PART_FILTERS = [
+  {id:'back', label:'Dos', categories:['Dos'], muscles:['Dos','Grand dorsal','Haut du dos','Trapèzes']},
+  {id:'abs', label:'Abdos', categories:['Abdominaux'], muscles:['Abdominaux']},
+  {id:'glutes', label:'Fessiers', categories:[], muscles:['Fessiers']},
+  {id:'calves', label:'Mollets', categories:[], muscles:['Mollets']},
+  {id:'thighs', label:'Cuisses', categories:['Jambes'], muscles:['Jambes','Quadriceps','Ischio-jambiers','Abducteurs','Adducteurs','Fléchisseurs de hanche']},
+  {id:'arms', label:'Bras', categories:['Bras','Avant-bras'], muscles:['Bras','Avant-bras','Biceps','Triceps']},
+  {id:'shoulders', label:'Épaules', categories:['Épaules'], muscles:['Épaules']},
+  {id:'chest', label:'Pecs', categories:['Pectoraux'], muscles:['Pectoraux']}
+];
+
 const normalize = text => text.toLocaleLowerCase('fr').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
 const frenchNames = [
@@ -21,11 +32,16 @@ const frenchNames = [
   [/\b(biceps)\b/i, 'biceps'], [/\b(triceps)\b/i, 'triceps']
 ];
 
-export function matchesExercise(exercise, {search = '', category = '', categories = category ? [category] : [], equipmentGroups = ['mat'], types = []} = {}) {
+export function matchesExercise(exercise, {search = '', category = '', categories = category ? [category] : [], bodyParts = [], equipmentGroups = ['mat'], types = []} = {}) {
   const aliases = frenchNames.filter(([pattern]) => pattern.test(exercise.name)).map(([, words]) => words).join(' ');
   const text = normalize(`${exercise.name} ${exercise.category} ${exercise.muscles.join(' ')} ${exercise.equipmentDetail} ${exercise.mobility ? 'étirements mobilité' : ''} ${aliases}`);
   const terms = normalize(search).split(' ').filter(Boolean);
+  const bodyPartMatches = (partId => {
+    const part = BODY_PART_FILTERS.find(filter => filter.id === partId);
+    return part && (part.categories.includes(exercise.category) || exercise.muscles.some(muscle => part.muscles.includes(muscle)));
+  });
   return terms.every(term => text.includes(term)) &&
+    (!bodyParts.length || bodyParts.some(bodyPartMatches)) &&
     (!categories.length || categories.includes(exercise.category)) &&
     (!types.length || types.some(type => exercise.types.includes(type))) &&
     exercise.equipmentGroups.every(group => group === 'none' || group === 'mat' || equipmentGroups.includes(equipmentFilterFor(group)));
@@ -39,9 +55,10 @@ export function automaticReplacement(exercises, items, index, filters) {
 }
 
 export function validGenerationFilters(filters) {
-  return filters && typeof filters === 'object' && !Array.isArray(filters) &&
-    typeof filters.search === 'string' &&
-    ['categories', 'equipmentGroups', 'types'].every(key => Array.isArray(filters[key]) && filters[key].every(value => typeof value === 'string'));
+  if (!filters || typeof filters !== 'object' || Array.isArray(filters) || typeof filters.search !== 'string' ||
+      !['equipmentGroups', 'types'].every(key => Array.isArray(filters[key]) && filters[key].every(value => typeof value === 'string'))) return false;
+  if (filters.bodyParts !== undefined) return Array.isArray(filters.bodyParts) && filters.bodyParts.every(value => BODY_PART_FILTERS.some(part => part.id === value));
+  return Array.isArray(filters.categories) && filters.categories.every(value => typeof value === 'string');
 }
 
 export function generateSession(exercises, minutes, filters = {}) {
