@@ -12,7 +12,7 @@ export const exercises = data.map(e => ({
   equipment:!e.equipment ? 'Sans poids' : weighted.has(e.equipment) ? 'Avec poids' : 'Autre matériel',
   equipmentDetail:equipmentNames[e.equipment] || (e.equipment ? e.equipment.replaceAll('_',' ') : 'Poids du corps'),
   muscles:[...new Set(e.muscles.map(m => muscles[m] || m))],
-  movement:e.muscles[0], steps:e.steps, images:[e.images.main, e.images.start, e.images.peak].filter(Boolean).map(path => imageBase + path)
+  movement:e.muscles[0], steps:e.steps, images:[...new Set([e.images.start, e.images.peak, e.images.main].filter(Boolean))].map(path => imageBase + path)
 }));
 
 const catalogById = new Map([...legacyExercises, ...exercises].map(exercise => [exercise.id, exercise]));
