@@ -83,7 +83,7 @@ test('matériels distincts, étiquettes multiples et couverture du catalogue', (
   const groups = new Set(EQUIPMENT_GROUPS.map(([id]) => id));
   const filterGroups = new Set(EQUIPMENT_FILTERS.map(([id]) => id));
   assert.equal(groups.size, EQUIPMENT_GROUPS.length);
-  assert.deepEqual([...filterGroups], ['dumbbell','kettlebell','barbell','flat_bench','mat','ball','band','machines']);
+  assert.deepEqual([...filterGroups], ['dumbbell','kettlebell','barbell','pull_up_dip_bar','flat_bench','mat','ball','band','machines']);
   for (const entry of data) {
     const exercise = exerciseById(`repdb:${entry.id}`);
     assert.ok(exercise.equipmentGroups.length, entry.id);
@@ -100,6 +100,12 @@ test('matériels distincts, étiquettes multiples et couverture du catalogue', (
   assert.ok(filter('captains-chair-leg-raise', ['machines']));
   assert.ok(filter('handstand-push-ups', ['machines']));
   assert.ok(filter('wall-sit', ['machines']));
+  assert.ok(filter('barbell-curl', ['barbell']));
+  assert.ok(!filter('barbell-curl', ['pull_up_dip_bar']));
+  assert.ok(filter('pull-up', ['pull_up_dip_bar']));
+  assert.ok(!filter('pull-up', ['barbell']));
+  assert.ok(filter('dips', ['pull_up_dip_bar']));
+  assert.ok(!filter('dips', ['machines']));
   assert.ok(exercises.filter(exercise => matchesExercise(exercise)).every(exercise => exercise.equipmentGroups.every(group => ['none','mat'].includes(group))));
   assert.ok(exercises.filter(exercise => matchesExercise(exercise, {equipmentGroups:[]})).every(exercise => exercise.equipmentGroups.every(group => ['none','mat'].includes(group))));
 });

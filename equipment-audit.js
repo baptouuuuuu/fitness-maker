@@ -3,7 +3,7 @@ export const EQUIPMENT_GROUPS = [
   ['none','Sans matériel'], ['mat','Tapis'],
   ['ab_crunch_machine','Machine à abdominaux'], ['ab_wheel','Roue abdominale'],
   ['air_bike','Air bike'], ['assisted_pullup_machine','Machine à tractions assistées'],
-  ['back_extension_machine','Machine à extensions lombaires'], ['barbell','Barre'],
+  ['back_extension_machine','Machine à extensions lombaires'], ['barbell','Barre de musculation'],
   ['battle_rope','Cordes ondulatoires'], ['bicep_curl_machine','Machine à biceps'],
   ['bicycle','Vélo'], ['bosu_ball','Bosu'], ['cable','Poulie'],
   ['chest_fly_machine','Machine à écartés'], ['chest_press_machine','Machine à pectoraux'],
@@ -35,7 +35,8 @@ export const EQUIPMENT_GROUPS = [
 ];
 
 export const EQUIPMENT_FILTERS = [
-  ['dumbbell','Haltères'], ['kettlebell','Kettlebell'], ['barbell','Barre'],
+  ['dumbbell','Haltères'], ['kettlebell','Kettlebell'], ['barbell','Barres de musculation'],
+  ['pull_up_dip_bar','Barres de traction et dips'],
   ['flat_bench','Banc'], ['mat','Tapis'], ['ball','Ballon'],
   ['band','Élastiques'], ['machines','Machines']
 ];
@@ -43,6 +44,7 @@ export const EQUIPMENT_FILTERS = [
 const equipmentFilterGroups = {
   dumbbell:'dumbbell', kettlebell:'kettlebell',
   barbell:'barbell', ez_bar:'barbell', trap_bar:'barbell',
+  pull_up_bar:'pull_up_dip_bar', dip_station:'pull_up_dip_bar',
   flat_bench:'flat_bench', mat:'mat',
   medicine_ball:'ball', slam_ball:'ball', stability_ball:'ball', wall_ball:'ball', bosu_ball:'ball',
   loop_band:'band', resistance_band:'band'
