@@ -26,6 +26,7 @@
 .equipment-filters .keyword-list input:focus-visible{outline:2px solid var(--lime);outline-offset:3px}
 .equipment-filters .keyword-list label:has(input:checked){background:#2c3828;color:#e3f2d5;box-shadow:inset 0 0 0 1px #8aa85e}
 .equipment-filters .keyword-list label:has(input:focus-visible){outline:2px solid var(--lime);outline-offset:3px}
+.equipment-filters:last-of-type .keyword-list{max-height:200px;overflow-y:auto;padding:3px}
 .session-item{grid-template-columns:auto 152px minmax(0,1fr)}
 .session-item .item-image{height:100px}
 @media(max-width:500px){.session-item{grid-template-columns:auto 100px minmax(0,1fr)}.session-item .item-image{height:76px}}

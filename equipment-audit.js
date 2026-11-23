@@ -34,11 +34,7 @@ export const EQUIPMENT_GROUPS = [
   ['wrist_roller','Rouleau à poignets']
 ];
 
-export const EQUIPMENT_FILTERS = [
-  ['dumbbell','Haltères'], ['kettlebell','Kettlebell'], ['barbell','Barre'],
-  ['flat_bench','Banc'], ['mat','Tapis'], ['ball','Ballon'],
-  ['band','Élastiques'], ['machines','Machines']
-];
+export const EQUIPMENT_FILTERS = EQUIPMENT_GROUPS.filter(([id]) => id !== 'none');
 
 const equipmentFilterGroups = {
   dumbbell:'dumbbell', kettlebell:'kettlebell',
@@ -93,9 +89,13 @@ single-leg-box-squat step-up-to-balance step-ups
 const extraEquipment = {
   captains_chair: ['captains-chair-knee-raise','captains-chair-leg-raise'],
   parallettes: ['handstand-push-ups'],
-  wall: ['legs-up-the-wall','wall-push-ups','wall-sit'],
-  plyo_box: ['barbell-box-squat','box-squat','step-ups'],
-  flat_bench: ['db-preacher-curl'],
+  wall: ['legs-up-the-wall','wall-push-ups','wall-sit','wall-hamstring-stretch',
+    'stability-ball-wall-squat','wall-ball','weighted-wall-crunch',
+    'supported-single-leg-stand','leg-swing-front-to-back'],
+  plyo_box: ['barbell-box-squat','box-squat','step-ups','single-leg-box-squat',
+    'decline-push-up','deficit-push-ups','incline-push-ups','step-up-to-balance',
+    'db-step-up-to-balance','kb-step-up-to-balance','barbell-calf-raise','deficit-deadlift'],
+  flat_bench: ['db-preacher-curl','banded-seated-hip-abduction'],
   pull_up_bar: ['band-assisted-pull-ups'],
   plates: ['barbell-ab-rollout','landmine-press','plate-loaded-donkey-calf-raise',
     'plate-loaded-glute-drive','plate-loaded-lateral-raise','plate-loaded-seated-dip-machine',

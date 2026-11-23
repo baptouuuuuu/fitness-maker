@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { exercises, exerciseById, EQUIPMENT_GROUPS } from '../exercises.js';
-import { EQUIPMENT_FILTERS, equipmentFilterFor } from '../equipment-audit.js';
+import { EQUIPMENT_FILTERS } from '../equipment-audit.js';
 import data from '../repdb-data.js';
 import { BODY_PART_FILTERS, matchesExercise, generateSession, automaticReplacement, recommend, validateItem, exportSession, importSession, makeTimeline, locatePhase, formatTime } from '../core.js';
 
@@ -74,7 +74,7 @@ test('matériel disponible : tous les équipements nécessaires et intersection 
   const matches = exercises.filter(exercise => matchesExercise(exercise, filters));
   assert.ok(matches.some(exercise => exercise.equipmentGroups.includes('none')));
   assert.ok(matches.some(exercise => exercise.equipmentGroups.includes('dumbbell')));
-  assert.ok(matches.every(exercise => exercise.category === 'Dos' && exercise.equipmentGroups.every(group => ['none','mat'].includes(group) || filters.equipmentGroups.includes(equipmentFilterFor(group)))));
+  assert.ok(matches.every(exercise => exercise.category === 'Dos' && exercise.equipmentGroups.every(group => ['none','mat'].includes(group) || filters.equipmentGroups.includes(group))));
   const benchPress = exerciseById('repdb:db-bench-press');
   assert.ok(!matchesExercise(benchPress, {equipmentGroups:['dumbbell']}));
   assert.ok(matchesExercise(benchPress, {equipmentGroups:['dumbbell','flat_bench']}));
@@ -83,12 +83,12 @@ test('matériels distincts, étiquettes multiples et couverture du catalogue', (
   const groups = new Set(EQUIPMENT_GROUPS.map(([id]) => id));
   const filterGroups = new Set(EQUIPMENT_FILTERS.map(([id]) => id));
   assert.equal(groups.size, EQUIPMENT_GROUPS.length);
-  assert.deepEqual([...filterGroups], ['dumbbell','kettlebell','barbell','flat_bench','mat','ball','band','machines']);
+  assert.deepEqual([...filterGroups], EQUIPMENT_GROUPS.map(([id]) => id).filter(id => id !== 'none'));
   for (const entry of data) {
     const exercise = exerciseById(`repdb:${entry.id}`);
     assert.ok(exercise.equipmentGroups.length, entry.id);
     assert.ok(exercise.equipmentGroups.every(group => groups.has(group)), entry.id);
-    assert.ok(exercise.equipmentGroups.filter(group => group !== 'none').every(group => filterGroups.has(equipmentFilterFor(group))), entry.id);
+    assert.ok(exercise.equipmentGroups.filter(group => group !== 'none').every(group => filterGroups.has(group)), entry.id);
     if (entry.equipment) assert.ok(exercise.equipmentGroups.includes(entry.equipment), entry.id);
   }
   const filter = (id, groups) => matchesExercise(exerciseById(`repdb:${id}`), {equipmentGroups:groups});
@@ -97,11 +97,33 @@ test('matériels distincts, étiquettes multiples et couverture du catalogue', (
   assert.ok(!filter('kettlebell-swing', ['mat']));
   assert.ok(filter('kettlebell-swing', ['kettlebell']));
   assert.ok(!filter('captains-chair-leg-raise', []));
-  assert.ok(filter('captains-chair-leg-raise', ['machines']));
-  assert.ok(filter('handstand-push-ups', ['machines']));
-  assert.ok(filter('wall-sit', ['machines']));
+  assert.ok(filter('captains-chair-leg-raise', ['captains_chair']));
+  assert.ok(filter('handstand-push-ups', ['parallettes']));
+  assert.ok(filter('wall-sit', ['wall']));
   assert.ok(exercises.filter(exercise => matchesExercise(exercise)).every(exercise => exercise.equipmentGroups.every(group => ['none','mat'].includes(group))));
   assert.ok(exercises.filter(exercise => matchesExercise(exercise, {equipmentGroups:[]})).every(exercise => exercise.equipmentGroups.every(group => ['none','mat'].includes(group))));
+});
+test('générateur : matériel précis et équipements secondaires obligatoires', () => {
+  const filter = (id, groups) => matchesExercise(exerciseById(`repdb:${id}`), {equipmentGroups:groups});
+  for (const id of ['decline-push-up','deficit-push-ups','incline-push-ups','step-up-to-balance']) {
+    assert.ok(!filter(id, []), id);
+    assert.ok(filter(id, ['plyo_box']), id);
+  }
+  assert.ok(!filter('db-step-up-to-balance', ['dumbbell']));
+  assert.ok(filter('db-step-up-to-balance', ['dumbbell','plyo_box']));
+  assert.ok(!filter('wall-ball', ['wall_ball']));
+  assert.ok(filter('wall-ball', ['wall_ball','wall']));
+  assert.ok(!filter('kettlebell-swing', ['dumbbell']));
+  assert.ok(!filter('wall-sit', ['pull_up_bar']));
+  assert.ok(!filter('banded-glute-bridge', ['resistance_band']));
+  assert.ok(filter('banded-glute-bridge', ['loop_band']));
+  for (const equipmentGroups of [[], ['dumbbell'], ['dumbbell','flat_bench'], ['pull_up_bar'], ['loop_band','wall']]) {
+    const items = generateSession(exercises, 120, {equipmentGroups, types:['strength']});
+    for (const item of items) {
+      const exercise = exerciseById(item.exerciseId);
+      assert.ok(exercise.equipmentGroups.every(group => ['none','mat'].includes(group) || equipmentGroups.includes(group)), exercise.id);
+    }
+  }
 });
 test('types : renforcement, étirement et mobilité combinables', () => {
   const stretch = exerciseById('repdb:childs-pose');
@@ -173,6 +195,16 @@ test('remplacement automatique respecte les filtres et exclut les exercices de l
     assert.ok(items.every(item => item.exerciseId !== replacement));
   }
   assert.throws(() => automaticReplacement(eligible.slice(0, 2), items, 0, filters), /Aucun autre exercice/);
+});
+test('remplacement automatique respecte le matériel précis et les anciens filtres restent utilisables', () => {
+  const filters = {search:'', bodyParts:[], types:['strength'], equipmentGroups:['dumbbell']};
+  const items = generateSession(exercises, 20, filters);
+  for (let i = 0; i < 20; i++) {
+    const replacement = exerciseById(automaticReplacement(exercises, items, 0, filters));
+    assert.ok(replacement.equipmentGroups.every(group => ['none','mat','dumbbell'].includes(group)));
+  }
+  assert.ok(matchesExercise(exerciseById('repdb:wall-sit'), {equipmentGroups:['machines']}));
+  assert.ok(matchesExercise(exerciseById('repdb:banded-glute-bridge'), {equipmentGroups:['band']}));
 });
 test('les filtres de génération survivent à un export et import, les anciens fichiers restent valides', () => {
   const filters = {search:'pompes', bodyParts:['back','thighs'], equipmentGroups:[], types:['strength']};

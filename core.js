@@ -44,7 +44,8 @@ export function matchesExercise(exercise, {search = '', category = '', categorie
     (!bodyParts.length || bodyParts.some(bodyPartMatches)) &&
     (!categories.length || categories.includes(exercise.category)) &&
     (!types.length || types.some(type => exercise.types.includes(type))) &&
-    exercise.equipmentGroups.every(group => group === 'none' || group === 'mat' || equipmentGroups.includes(equipmentFilterFor(group)));
+    exercise.equipmentGroups.every(group => group === 'none' || group === 'mat' || equipmentGroups.includes(group) ||
+      (['ball','band','machines'].includes(equipmentFilterFor(group)) && equipmentGroups.includes(equipmentFilterFor(group))));
 }
 
 export function automaticReplacement(exercises, items, index, filters) {
