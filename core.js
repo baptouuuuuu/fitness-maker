@@ -92,7 +92,7 @@ export function recommend(exercises, session) {
 }
 
 export function validateItem(item) {
-  return item && typeof item.exerciseId === 'string' && Number.isInteger(item.work) && item.work >= 5 && item.work <= 600 && Number.isInteger(item.rest) && item.rest >= 0 && item.rest <= 300 && Number.isInteger(item.sets) && item.sets >= 1 && item.sets <= 10 && (item.reps === undefined || (Number.isInteger(item.reps) && item.reps >= 0 && item.reps <= 999));
+  return item && (item.exerciseId === null || typeof item.exerciseId === 'string') && Number.isInteger(item.work) && item.work >= 5 && item.work <= 600 && Number.isInteger(item.rest) && item.rest >= 0 && item.rest <= 300 && Number.isInteger(item.sets) && item.sets >= 1 && item.sets <= 10 && (item.reps === undefined || (Number.isInteger(item.reps) && item.reps >= 0 && item.reps <= 999));
 }
 
 export function exportSession(session) {
@@ -109,7 +109,7 @@ export function importSession(text, exerciseById) {
       (data.generationFilters !== undefined && !validGenerationFilters(data.generationFilters))) {
     throw new Error('Format de séance invalide ou non pris en charge.');
   }
-  if (!data.items.every(item => exerciseById(item.exerciseId))) throw new Error('Cette séance contient des exercices inconnus dans ce catalogue.');
+  if (!data.items.every(item => item.exerciseId === null || exerciseById(item.exerciseId))) throw new Error('Cette séance contient des exercices inconnus dans ce catalogue.');
   return {name:data.name.trim(), items:data.items.map(({exerciseId, sets, reps, work, rest}) => ({exerciseId, sets, ...(reps === undefined ? {} : {reps}), work, rest})), ...(data.generationFilters ? {generationFilters:data.generationFilters} : {})};
 }
 

@@ -27,6 +27,15 @@ test('chronologie distingue les occurrences répétées du même exercice', () =
   const items = [{exerciseId:'a',sets:2,work:10,rest:5},{exerciseId:'a',sets:1,work:20,rest:0}];
   assert.deepEqual(makeTimeline(items).map(p => p.itemIndex), [0,0,0,0,1]);
 });
+test('chrono libre : intervalles, repos final omis et export/import', () => {
+  const timer = {exerciseId:null,sets:3,work:20,rest:10};
+  assert.ok(validateItem(timer));
+  assert.deepEqual(makeTimeline([timer]).map(p => [p.type,p.duration]), [['work',20],['rest',10],['work',20],['rest',10],['work',20]]);
+  assert.deepEqual(makeTimeline([timer,{exerciseId:'0001',sets:1,work:30,rest:0}]).map(p => p.type), ['work','rest','work','rest','work','rest','work']);
+  const session = {name:'Intervalles',items:[timer,{exerciseId:'0001',sets:1,work:30,rest:0}]};
+  assert.deepEqual(importSession(exportSession(session), exerciseById), session);
+  assert.ok(!validateItem({...timer,exerciseId:undefined}));
+});
 test('export et import de séance conservent les paramètres sans identifiant local', () => {
   const session = {id:'local',name:'Séance',items:[{exerciseId:'0001',sets:2,work:30,rest:10},{exerciseId:'repdb:muscle-ups',sets:1,reps:12,work:45,rest:0}]};
   const json = exportSession(session);
