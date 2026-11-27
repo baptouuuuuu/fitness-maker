@@ -138,11 +138,13 @@ const exerciseDatalist = () => exerciseOptions ||= `<datalist id="exercise-names
 const emptySet = () => ({reps:'', weight:''});
 function logForm() {
   const draft = state.logDraft;
-  return `<form class="panel log-form" id="log-form"><h2>Nouvelle séance</h2><div class="generator-fields"><label>Date<input type="date" data-log="date" value="${escapeHtml(draft.date)}" max="${today()}"></label><label>Nom<input type="text" data-log="name" maxlength="80" value="${escapeHtml(draft.name)}"></label></div>${exerciseDatalist()}${draft.entries.map((entry,i) => `<div class="log-entry"><div class="log-entry-head"><input type="text" list="exercise-names" placeholder="Exercice…" data-entry-ex="${i}" value="${entry.exerciseId ? escapeHtml(byId(entry.exerciseId).name) : escapeHtml(entry.text || '')}" aria-label="Exercice"><button type="button" class="text-button" data-action="log-remove-entry" data-index="${i}">Retirer</button></div>${entry.sets.map((set,j) => `<div class="log-set"><span>Série ${j+1}</span><input type="number" min="1" max="999" step="1" inputmode="numeric" placeholder="Reps" data-entry="${i}" data-set="${j}" data-field="reps" value="${escapeHtml(set.reps)}" aria-label="Répétitions série ${j+1}"><input type="number" min="0" max="1000" step="0.5" inputmode="decimal" placeholder="Poids (kg)" data-entry="${i}" data-set="${j}" data-field="weight" value="${escapeHtml(set.weight)}" aria-label="Poids série ${j+1}"><button type="button" class="text-button" data-action="log-remove-set" data-index="${i}" data-set="${j}" aria-label="Retirer la série ${j+1}">×</button></div>`).join('')}<button type="button" class="text-button" data-action="log-add-set" data-index="${i}">+ Série</button></div>`).join('')}<div class="log-actions"><button type="button" class="secondary" data-action="log-add-entry">+ Exercice</button><button type="submit" class="primary">Enregistrer</button><button type="button" class="text-button" data-action="log-cancel">Annuler</button></div></form>`;
+  const editingEntry = draft.entryIndex !== null;
+  const title = editingEntry ? 'Modifier un exercice' : draft.logId ? 'Modifier la séance' : 'Nouvelle séance';
+  return `<form class="panel log-form" id="log-form"><h2>${title}</h2>${editingEntry ? '' : `<div class="generator-fields"><label>Date<input type="date" data-log="date" value="${escapeHtml(draft.date)}" max="${today()}"></label><label>Nom<input type="text" data-log="name" maxlength="80" value="${escapeHtml(draft.name)}"></label></div>`}${exerciseDatalist()}${draft.entries.map((entry,i) => `<div class="log-entry"><div class="log-entry-head"><input type="text" list="exercise-names" placeholder="Exercice…" data-entry-ex="${i}" value="${entry.exerciseId ? escapeHtml(byId(entry.exerciseId).name) : escapeHtml(entry.text || '')}" aria-label="Exercice"><button type="button" class="text-button" data-action="log-remove-entry" data-index="${i}" ${editingEntry ? 'hidden' : ''}>Retirer</button></div>${entry.sets.map((set,j) => `<div class="log-set"><span>Série ${j+1}</span><input type="number" min="1" max="999" step="1" inputmode="numeric" placeholder="Reps" data-entry="${i}" data-set="${j}" data-field="reps" value="${escapeHtml(set.reps)}" aria-label="Répétitions série ${j+1}"><input type="number" min="0" max="1000" step="0.5" inputmode="decimal" placeholder="Poids (kg)" data-entry="${i}" data-set="${j}" data-field="weight" value="${escapeHtml(set.weight)}" aria-label="Poids série ${j+1}"><button type="button" class="text-button" data-action="log-remove-set" data-index="${i}" data-set="${j}" aria-label="Retirer la série ${j+1}">×</button></div>`).join('')}<button type="button" class="text-button" data-action="log-add-set" data-index="${i}">+ Série</button></div>`).join('')}<div class="log-actions">${editingEntry ? '' : '<button type="button" class="secondary" data-action="log-add-entry">+ Exercice</button>'}<button type="submit" class="primary">Enregistrer</button><button type="button" class="text-button" data-action="log-cancel">Annuler</button></div></form>`;
 }
 function trackingPage() {
   const logs = [...state.logs].sort((a,b) => b.date.localeCompare(a.date));
-  return `<div class="eyebrow"><span></span> VOTRE PROGRESSION</div><div class="heading-row"><div><h1>Suivi de vos <em>séances.</em></h1><p class="intro">Notez vos répétitions et vos charges, même pour les séances faites hors de l’application.</p></div>${state.logDraft ? '' : '<button class="primary" data-action="log-new">＋ Ajouter une séance</button>'}</div>${state.logDraft ? logForm() : ''}<section class="log-list">${logs.length ? logs.map(log => `<article class="panel log-card"><div class="log-card-head"><div><strong>${escapeHtml(log.name)}</strong><small>${formatDate(log.date)}</small></div><button class="secondary danger" data-action="log-delete" data-id="${escapeHtml(log.id)}">Supprimer</button></div>${log.entries.map(entry => `<div class="log-line"><div><strong>${escapeHtml(byId(entry.exerciseId).name)}</strong><span>${entry.sets.map(set => `${set.reps}${set.weight !== null ? ` × ${set.weight} kg` : ' reps'}`).join(' · ')}</span></div><button class="text-button" data-action="chart" data-id="${escapeHtml(entry.exerciseId)}">Voir le graphique ↗</button></div>`).join('')}</article>`).join('') : '<p class="empty">Aucune séance suivie pour l’instant.</p>'}</section>`;
+  return `<div class="eyebrow"><span></span> VOTRE PROGRESSION</div><div class="heading-row"><div><h1>Suivi de vos <em>séances.</em></h1><p class="intro">Notez vos répétitions et vos charges, même pour les séances faites hors de l’application.</p></div>${state.logDraft ? '' : '<button class="primary" data-action="log-new">＋ Ajouter une séance</button>'}</div>${state.logDraft ? logForm() : ''}<section class="log-list">${logs.length ? logs.map(log => `<article class="panel log-card"><div class="log-card-head"><div><strong>${escapeHtml(log.name)}</strong><small>${formatDate(log.date)}</small></div><div class="log-actions"><button class="secondary" data-action="log-edit" data-id="${escapeHtml(log.id)}">Modifier la séance</button><button class="secondary danger" data-action="log-delete" data-id="${escapeHtml(log.id)}">Supprimer</button></div></div>${log.entries.map((entry,index) => `<div class="log-line"><div><strong>${escapeHtml(byId(entry.exerciseId).name)}</strong><span>${entry.sets.map(set => `${set.reps}${set.weight !== null ? ` × ${set.weight} kg` : ' reps'}`).join(' · ')}</span></div><div class="log-actions"><button class="text-button" data-action="log-edit-entry" data-id="${escapeHtml(log.id)}" data-entry-index="${index}">Modifier</button><button class="text-button" data-action="chart" data-id="${escapeHtml(entry.exerciseId)}">Voir le graphique ↗</button></div></div>`).join('')}</article>`).join('') : '<p class="empty">Aucune séance suivie pour l’instant.</p>'}</section>`;
 }
 function exerciseHistory(id) {
   return state.logs.map(log => {
@@ -200,6 +202,7 @@ function add(id) {
 }
 function submitLog() {
   const draft = state.logDraft;
+  const editingEntry = draft.entryIndex !== null;
   const entries = [];
   for (const entry of draft.entries) {
     if (!entry.exerciseId && !entry.sets.some(set => set.reps !== '' || set.weight !== '')) continue;
@@ -215,15 +218,43 @@ function submitLog() {
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date)) return notify('Choisissez une date.');
   if (!entries.length) return notify('Ajoutez au moins un exercice avec une série.');
-  state.logs.push({id:uid(), date:draft.date, name:draft.name.trim().slice(0,80) || 'Séance', entries});
+  if (draft.logId) {
+    const log = state.logs.find(item => item.id === draft.logId);
+    if (!log) return notify('Cette séance n’existe plus dans le suivi.');
+    if (editingEntry) {
+      if (!log.entries[draft.entryIndex]) return notify('Cet exercice n’existe plus dans cette séance.');
+      log.entries[draft.entryIndex] = entries[0];
+    } else {
+      log.date = draft.date;
+      log.name = draft.name.trim().slice(0,80) || 'Séance';
+      log.entries = entries;
+    }
+  } else {
+    state.logs.push({id:uid(), date:draft.date, name:draft.name.trim().slice(0,80) || 'Séance', entries});
+  }
   state.logDraft = null;
   warning = '';
   persist();
-  notify(warning || 'Séance ajoutée au suivi.');
+  notify(warning || (draft.logId ? 'Modifications enregistrées.' : 'Séance ajoutée au suivi.'));
 }
 function newLogDraft(name = '', entries = [{exerciseId:null, sets:[emptySet()]}]) {
-  state.logDraft = {date:today(), name, entries};
+  state.logDraft = {date:today(), name, entries, logId:null, entryIndex:null};
   state.page = 'tracking';
+}
+function editLogDraft(logId, entryIndex = null) {
+  const log = state.logs.find(item => item.id === logId);
+  if (!log) return;
+  const draftEntry = entry => ({
+    ...entry,
+    sets:entry.sets.map(set => ({reps:String(set.reps), weight:set.weight === null ? '' : String(set.weight)}))
+  });
+  state.logDraft = {
+    date:log.date,
+    name:log.name,
+    entries:entryIndex === null ? log.entries.map(draftEntry) : [draftEntry(log.entries[entryIndex])],
+    logId,
+    entryIndex
+  };
 }
 function save() {
   if (!state.draft.items.length) return notify('Ajoutez un exercice ou un chrono avant d’enregistrer.');
@@ -310,12 +341,14 @@ app.addEventListener('click', event => {
   const index = Number(button.dataset.index);
   switch (action) {
     case 'log-new': newLogDraft(); render(); break;
+    case 'log-edit': editLogDraft(id); render(); break;
+    case 'log-edit-entry': editLogDraft(id, Number(button.dataset.entryIndex)); render(); break;
     case 'log-cancel': state.logDraft = null; render(); break;
     case 'log-add-entry': state.logDraft.entries.push({exerciseId:null, sets:[emptySet()]}); render(); break;
     case 'log-remove-entry': state.logDraft.entries.splice(index,1); render(); break;
     case 'log-add-set': state.logDraft.entries[index]?.sets.push(emptySet()); render(); break;
     case 'log-remove-set': state.logDraft.entries[index]?.sets.splice(Number(button.dataset.set),1); render(); break;
-    case 'log-delete': if (confirm('Supprimer cette séance du suivi ?')) { state.logs = state.logs.filter(log => log.id !== id); persist(); render(); } break;
+    case 'log-delete': if (confirm('Supprimer cette séance du suivi ?')) { state.logs = state.logs.filter(log => log.id !== id); if (state.logDraft?.logId === id) state.logDraft = null; persist(); render(); } break;
     case 'chart': if (byId(id)) { state.chart = {id, metric:'both'}; render(); } break;
     case 'chart-metric': state.chart.metric = id; render(); break;
     case 'close-chart': state.chart = null; render(); break;
