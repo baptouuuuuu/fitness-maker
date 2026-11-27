@@ -46,5 +46,56 @@ test('la séance en cours reste indépendante du brouillon', async t => {
   state = JSON.parse(stored);
   assert.equal(state.runner, null);
   assert.equal(state.draft.items[0].exerciseId, 'repdb:muscle-ups');
-  assert.doesNotMatch(app.innerHTML, /Une séance en cours/);
+  assert.match(app.innerHTML, /Aucune séance en cours/);
+});
+
+test('une séance en arrière-plan continue et survit au rechargement', async t => {
+  const handlers = {};
+  const app = {innerHTML:'', addEventListener(type, handler) { handlers[type] = handler; }};
+  let now = 100000;
+  let interval;
+  let stored = JSON.stringify({
+    sound:false,
+    draft:{id:null, name:'Séance initiale', items:[{exerciseId:'0001', sets:2, work:20, rest:10}]}
+  });
+  const globals = {
+    document:{querySelector:selector => selector === '#app' ? app : null, addEventListener() {}},
+    window:{scrollTo() {}, addEventListener() {}},
+    localStorage:{getItem:key => key === STORAGE_KEY ? stored : null, setItem(key, value) { if (key === STORAGE_KEY) stored = value; }},
+    confirm:() => true,
+    setInterval:handler => { interval = handler; return 1; },
+    clearInterval:() => {}
+  };
+  for (const [key,value] of Object.entries(globals)) {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, key);
+    Object.defineProperty(globalThis, key, {value, configurable:true, writable:true});
+    t.after(() => descriptor ? Object.defineProperty(globalThis, key, descriptor) : delete globalThis[key]);
+  }
+  const originalNow = Date.now;
+  Date.now = () => now;
+  t.after(() => { Date.now = originalNow; });
+  await import('../app.js?background-test');
+  const click = dataset => handlers.click({target:{closest:() => ({dataset})}});
+  click({page:'session'});
+  click({action:'start'});
+  click({action:'background-runner'});
+  assert.match(app.innerHTML, /En arrière-plan/);
+  assert.doesNotMatch(app.innerHTML, /runner-overlay/);
+  now += 15000;
+  interval();
+  assert.equal(JSON.parse(stored).runner.running, true);
+
+  now += 10000;
+  await import('../app.js?background-reload-test');
+  click({page:'session'});
+  assert.match(app.innerHTML, /00:25<\/strong> temps restant/);
+  click({action:'resume'});
+  assert.match(app.innerHTML, /Temps de repos/);
+  assert.match(app.innerHTML, /00:05/);
+  click({action:'background-runner'});
+  now += 30000;
+  interval();
+  assert.match(app.innerHTML, /Terminée/);
+  click({action:'resume'});
+  assert.match(app.innerHTML, /Bravo, vous l’avez fait/);
 });

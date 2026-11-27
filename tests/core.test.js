@@ -3,7 +3,16 @@ import assert from 'node:assert/strict';
 import { exercises, exerciseById, EQUIPMENT_GROUPS } from '../exercises.js';
 import { EQUIPMENT_FILTERS, equipmentFilterFor } from '../equipment-audit.js';
 import data from '../repdb-data.js';
-import { BODY_PART_FILTERS, matchesExercise, generateSession, automaticReplacement, recommend, validateItem, exportSession, importSession, makeTimeline, locatePhase, formatTime, MAX_SETS } from '../core.js';
+import { BODY_PART_FILTERS, matchesExercise, generateSession, automaticReplacement, recommend, validateItem, exportSession, importSession, makeTimeline, locatePhase, formatTime, trackingUnit, MAX_SETS } from '../core.js';
+
+test('unité proposée pour les exercices statiques et dynamiques', () => {
+  for (const id of ['repdb:plank','repdb:90-90-hold','repdb:wall-sit','repdb:dead-hang','repdb:childs-pose']) {
+    assert.equal(trackingUnit(exerciseById(id)), 'seconds', id);
+  }
+  for (const id of ['repdb:plank-knee-tuck','repdb:reverse-plank-dips','repdb:hang-clean','0001']) {
+    assert.equal(trackingUnit(exerciseById(id)), 'reps', id);
+  }
+});
 
 test('catalogue RepDB complet et séances précédentes conservées', () => {
   assert.equal(exercises.length, 708);
