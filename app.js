@@ -1,6 +1,6 @@
 import { exercises, exerciseById } from './exercises.js';
 import { EQUIPMENT_FILTERS } from './equipment-audit.js';
-import { STORAGE_KEY, MAX_SETS, BODY_PART_FILTERS, matchesExercise, generateSession, automaticReplacement, validGenerationFilters, recommend, validateItem, exportSession, importSession, makeTimeline, formatTime, locatePhase } from './core.js';
+import { STORAGE_KEY, MAX_SETS, BODY_PART_FILTERS, matchesExercise, generateSession, automaticReplacement, validGenerationFilters, recommend, validateItem, exportSession, importSession, makeTimeline, formatTime, locatePhase, trackingUnit } from './core.js';
 
 const app = document.querySelector('#app');
 const byId = exerciseById;
@@ -30,7 +30,8 @@ function restoreRunner(savedRunner) {
   const phase = locatePhase(timeline, elapsed);
   return {timeline, items, name:typeof savedRunner.name === 'string' ? savedRunner.name : (saved.draft?.name || 'Séance'), index:phase.index, remaining:phase.remaining, elapsed, startedAt:Date.now(), paused:!running};
 }
-const validLog = log => log && typeof log.id === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(log.date) && typeof log.name === 'string' && Array.isArray(log.entries) && log.entries.every(entry => entry && byId(entry.exerciseId) && Array.isArray(entry.sets) && entry.sets.every(set => Number.isFinite(set.reps) && set.reps > 0 && (set.weight === null || Number.isFinite(set.weight))));
+const entryUnit = entry => entry.unit === 'seconds' ? 'seconds' : 'reps';
+const validLog = log => log && typeof log.id === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(log.date) && typeof log.name === 'string' && Array.isArray(log.entries) && log.entries.every(entry => entry && byId(entry.exerciseId) && (entry.unit === undefined || ['reps','seconds'].includes(entry.unit)) && Array.isArray(entry.sets) && entry.sets.every(set => Number.isFinite(set[entryUnit(entry)]) && set[entryUnit(entry)] > 0 && (set.weight === null || Number.isFinite(set.weight))));
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const formatDate = date => new Date(`${date}T12:00:00`).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
 const restoredRunner = restoreRunner(saved.runner);
@@ -142,23 +143,23 @@ function runnerModal() {
 }
 let exerciseOptions;
 const exerciseDatalist = () => exerciseOptions ||= `<datalist id="exercise-names">${exercises.map(e => `<option value="${escapeHtml(e.name)}"></option>`).join('')}</datalist>`;
-const emptySet = () => ({reps:'', weight:''});
+const emptySet = () => ({value:'', weight:''});
 function logForm() {
   const draft = state.logDraft;
   const editingEntry = draft.entryIndex !== null;
   const title = editingEntry ? 'Modifier un exercice' : draft.logId ? 'Modifier la séance' : 'Nouvelle séance';
-  return `<form class="panel log-form" id="log-form"><h2>${title}</h2>${editingEntry ? '' : `<div class="generator-fields"><label>Date<input type="date" data-log="date" value="${escapeHtml(draft.date)}" max="${today()}"></label><label>Nom<input type="text" data-log="name" maxlength="80" value="${escapeHtml(draft.name)}"></label></div>`}${exerciseDatalist()}${draft.entries.map((entry,i) => `<div class="log-entry"><div class="log-entry-head"><input type="text" list="exercise-names" placeholder="Exercice…" data-entry-ex="${i}" value="${entry.exerciseId ? escapeHtml(byId(entry.exerciseId).name) : escapeHtml(entry.text || '')}" aria-label="Exercice"><button type="button" class="text-button" data-action="log-remove-entry" data-index="${i}" ${editingEntry ? 'hidden' : ''}>Retirer</button></div>${entry.sets.map((set,j) => `<div class="log-set"><span>Série ${j+1}</span><input type="number" min="1" max="999" step="1" inputmode="numeric" placeholder="Reps" data-entry="${i}" data-set="${j}" data-field="reps" value="${escapeHtml(set.reps)}" aria-label="Répétitions série ${j+1}"><input type="number" min="0" max="1000" step="0.5" inputmode="decimal" placeholder="Poids (kg)" data-entry="${i}" data-set="${j}" data-field="weight" value="${escapeHtml(set.weight)}" aria-label="Poids série ${j+1}"><button type="button" class="text-button" data-action="log-remove-set" data-index="${i}" data-set="${j}" aria-label="Retirer la série ${j+1}">×</button></div>`).join('')}<button type="button" class="text-button" data-action="log-add-set" data-index="${i}">+ Série</button></div>`).join('')}<div class="log-actions">${editingEntry ? '' : '<button type="button" class="secondary" data-action="log-add-entry">+ Exercice</button>'}<button type="submit" class="primary">Enregistrer</button><button type="button" class="text-button" data-action="log-cancel">Annuler</button></div></form>`;
+  return `<form class="panel log-form" id="log-form"><h2>${title}</h2>${editingEntry ? '' : `<div class="generator-fields"><label>Date<input type="date" data-log="date" value="${escapeHtml(draft.date)}" max="${today()}"></label><label>Nom<input type="text" data-log="name" maxlength="80" value="${escapeHtml(draft.name)}"></label></div>`}${exerciseDatalist()}${draft.entries.map((entry,i) => `<div class="log-entry"><div class="log-entry-head"><input type="text" list="exercise-names" placeholder="Exercice…" data-entry-ex="${i}" value="${entry.exerciseId ? escapeHtml(byId(entry.exerciseId).name) : escapeHtml(entry.text || '')}" aria-label="Exercice"><button type="button" class="text-button" data-action="log-remove-entry" data-index="${i}" ${editingEntry ? 'hidden' : ''}>Retirer</button></div><label>Unité<select data-entry-unit="${i}"><option value="reps" ${entry.unit !== 'seconds' ? 'selected' : ''}>Répétitions</option><option value="seconds" ${entry.unit === 'seconds' ? 'selected' : ''}>Secondes</option></select></label>${entry.sets.map((set,j) => `<div class="log-set"><span>Série ${j+1}</span><input type="number" min="1" max="${entry.unit === 'seconds' ? 3600 : 999}" step="1" inputmode="numeric" placeholder="${entry.unit === 'seconds' ? 'Secondes' : 'Reps'}" data-entry="${i}" data-set="${j}" data-field="value" value="${escapeHtml(set.value)}" aria-label="${entry.unit === 'seconds' ? 'Secondes' : 'Répétitions'} série ${j+1}"><input type="number" min="0" max="1000" step="0.5" inputmode="decimal" placeholder="Poids (kg)" data-entry="${i}" data-set="${j}" data-field="weight" value="${escapeHtml(set.weight)}" aria-label="Poids série ${j+1}"><button type="button" class="text-button" data-action="log-remove-set" data-index="${i}" data-set="${j}" aria-label="Retirer la série ${j+1}">×</button></div>`).join('')}<button type="button" class="text-button" data-action="log-add-set" data-index="${i}">+ Série</button></div>`).join('')}<div class="log-actions">${editingEntry ? '' : '<button type="button" class="secondary" data-action="log-add-entry">+ Exercice</button>'}<button type="submit" class="primary">Enregistrer</button><button type="button" class="text-button" data-action="log-cancel">Annuler</button></div></form>`;
 }
 function trackingPage() {
   const logs = [...state.logs].sort((a,b) => b.date.localeCompare(a.date));
-  return `<div class="eyebrow"><span></span> VOTRE PROGRESSION</div><div class="heading-row"><div><h1>Suivi de vos <em>séances.</em></h1><p class="intro">Notez vos répétitions et vos charges, même pour les séances faites hors de l’application.</p></div>${state.logDraft ? '' : '<button class="primary" data-action="log-new">＋ Ajouter une séance</button>'}</div>${state.logDraft ? logForm() : ''}<section class="log-list">${logs.length ? logs.map(log => `<article class="panel log-card"><div class="log-card-head"><div><strong>${escapeHtml(log.name)}</strong><small>${formatDate(log.date)}</small></div><div class="log-actions"><button class="secondary" data-action="log-edit" data-id="${escapeHtml(log.id)}">Modifier la séance</button><button class="secondary danger" data-action="log-delete" data-id="${escapeHtml(log.id)}">Supprimer</button></div></div>${log.entries.map((entry,index) => `<div class="log-line"><div><strong>${escapeHtml(byId(entry.exerciseId).name)}</strong><span>${entry.sets.map(set => `${set.reps}${set.weight !== null ? ` × ${set.weight} kg` : ' reps'}`).join(' · ')}</span></div><div class="log-actions"><button class="text-button" data-action="log-edit-entry" data-id="${escapeHtml(log.id)}" data-entry-index="${index}">Modifier</button><button class="text-button" data-action="chart" data-id="${escapeHtml(entry.exerciseId)}">Voir le graphique ↗</button></div></div>`).join('')}</article>`).join('') : '<p class="empty">Aucune séance suivie pour l’instant.</p>'}</section>`;
+  return `<div class="eyebrow"><span></span> VOTRE PROGRESSION</div><div class="heading-row"><div><h1>Suivi de vos <em>séances.</em></h1><p class="intro">Notez vos répétitions ou vos secondes et vos charges, même pour les séances faites hors de l’application.</p></div>${state.logDraft ? '' : '<button class="primary" data-action="log-new">＋ Ajouter une séance</button>'}</div>${state.logDraft ? logForm() : ''}<section class="log-list">${logs.length ? logs.map(log => `<article class="panel log-card"><div class="log-card-head"><div><strong>${escapeHtml(log.name)}</strong><small>${formatDate(log.date)}</small></div><div class="log-actions"><button class="secondary" data-action="log-edit" data-id="${escapeHtml(log.id)}">Modifier la séance</button><button class="secondary danger" data-action="log-delete" data-id="${escapeHtml(log.id)}">Supprimer</button></div></div>${log.entries.map((entry,index) => `<div class="log-line"><div><strong>${escapeHtml(byId(entry.exerciseId).name)}</strong><span>${entry.sets.map(set => `${set[entryUnit(entry)]} ${entryUnit(entry) === 'seconds' ? 's' : 'reps'}${set.weight !== null ? ` × ${set.weight} kg` : ''}`).join(' · ')}</span></div><div class="log-actions"><button class="text-button" data-action="log-edit-entry" data-id="${escapeHtml(log.id)}" data-entry-index="${index}">Modifier</button><button class="text-button" data-action="chart" data-id="${escapeHtml(entry.exerciseId)}" data-unit="${entryUnit(entry)}">Voir le graphique ↗</button></div></div>`).join('')}</article>`).join('') : '<p class="empty">Aucune séance suivie pour l’instant.</p>'}</section>`;
 }
-function exerciseHistory(id) {
+function exerciseHistory(id, unit) {
   return state.logs.map(log => {
-    const sets = log.entries.filter(entry => entry.exerciseId === id).flatMap(entry => entry.sets);
+    const sets = log.entries.filter(entry => entry.exerciseId === id && entryUnit(entry) === unit).flatMap(entry => entry.sets);
     if (!sets.length) return null;
     const weights = sets.filter(set => set.weight !== null).map(set => set.weight);
-    return {date:log.date, reps:sets.reduce((sum,set) => sum + set.reps, 0), weight:weights.length ? Math.max(...weights) : null};
+    return {date:log.date, value:sets.reduce((sum,set) => sum + set[unit], 0), weight:weights.length ? Math.max(...weights) : null};
   }).filter(Boolean).sort((a,b) => a.date.localeCompare(b.date));
 }
 function chartSvg(points, metric, color, side) {
@@ -168,8 +169,7 @@ function chartSvg(points, metric, color, side) {
   const times = points.map(p => new Date(`${p.date}T12:00:00`).getTime());
   const t0 = Math.min(...times), t1 = Math.max(...times);
   const values = data.map(p => p[metric]);
-  let lo = Math.min(...values), hi = Math.max(...values);
-  if (lo === hi) { lo = Math.max(0, lo - 1); hi += 1; }
+  const lo = 0, hi = Math.max(1, ...values);
   const x = p => L + (t1 === t0 ? (W - L - R) / 2 : (new Date(`${p.date}T12:00:00`).getTime() - t0) / (t1 - t0) * (W - L - R));
   const y = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
   const ax = side === 'left' ? L : W - R;
@@ -181,13 +181,17 @@ function chartSvg(points, metric, color, side) {
 function chartModal() {
   const exercise = byId(state.chart.id);
   const metric = state.chart.metric;
-  const points = exerciseHistory(state.chart.id);
+  const unit = state.chart.unit;
+  const points = exerciseHistory(state.chart.id, unit);
+  const units = ['reps','seconds'].filter(value => exerciseHistory(state.chart.id, value).length);
   const W = 520, H = 240, L = 48, R = 48, T = 16, B = 36;
   const showWeight = metric !== 'reps', showReps = metric !== 'weight';
   const hasWeight = points.some(p => p.weight !== null);
-  const svg = `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Évolution de ${escapeHtml(exercise.name)}"><line x1="${L}" y1="${T}" x2="${L}" y2="${H - B}" stroke="#555"/><line x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}" stroke="#555"/><line x1="${W - R}" y1="${T}" x2="${W - R}" y2="${H - B}" stroke="#555"/><text x="${L}" y="${H - 12}" font-size="11" fill="#aaa">${formatDate(points[0].date)}</text><text x="${W - R}" y="${H - 12}" font-size="11" text-anchor="end" fill="#aaa">${points.length > 1 ? formatDate(points[points.length - 1].date) : ''}</text>${showWeight ? chartSvg(points,'weight','#f2a65a','left') : ''}${showReps ? chartSvg(points,'reps','#7bd88f','right') : ''}</svg>`;
+  const svg = points.length ? `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Évolution de ${escapeHtml(exercise.name)}"><line x1="${L}" y1="${T}" x2="${L}" y2="${H - B}" stroke="#555"/><line x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}" stroke="#555"/><line x1="${W - R}" y1="${T}" x2="${W - R}" y2="${H - B}" stroke="#555"/><text x="${L}" y="${H - 12}" font-size="11" fill="#aaa">${formatDate(points[0].date)}</text><text x="${W - R}" y="${H - 12}" font-size="11" text-anchor="end" fill="#aaa">${points.length > 1 ? formatDate(points[points.length - 1].date) : ''}</text>${showWeight ? chartSvg(points,'weight','#f2a65a','left') : ''}${showReps ? chartSvg(points,'value','#7bd88f','right') : ''}</svg>` : '';
   const btn = (value,label) => `<button class="${metric === value ? 'primary' : 'secondary'}" data-action="chart-metric" data-id="${value}" aria-pressed="${metric === value}">${label}</button>`;
-  return `<div class="overlay detail-overlay"><section class="modal chart-modal" role="dialog" aria-modal="true" aria-labelledby="chart-title"><button class="close" data-action="close-chart" aria-label="Fermer">×</button><div class="detail-content"><h2 id="chart-title">${escapeHtml(exercise.name)}</h2><div class="log-actions">${btn('both','Poids + reps')}${btn('weight','Poids')}${btn('reps','Reps')}</div>${points.length ? svg : '<p class="empty">Pas encore de données.</p>'}<p class="chart-legend"><span style="color:#f2a65a">● Poids max (kg)</span> <span style="color:#7bd88f">● Reps totales</span>${hasWeight ? '' : ' · aucun poids renseigné'}</p></div></section></div>`;
+  const unitLabel = unit === 'seconds' ? 'secondes' : 'reps';
+  const unitButtons = units.length > 1 ? `<div class="log-actions" aria-label="Unité des séries">${units.map(value => `<button class="${unit === value ? 'primary' : 'secondary'}" data-action="chart-unit" data-id="${value}" aria-pressed="${unit === value}">${value === 'seconds' ? 'Secondes' : 'Répétitions'}</button>`).join('')}</div>` : '';
+  return `<div class="overlay detail-overlay"><section class="modal chart-modal" role="dialog" aria-modal="true" aria-labelledby="chart-title"><button class="close" data-action="close-chart" aria-label="Fermer">×</button><div class="detail-content"><h2 id="chart-title">${escapeHtml(exercise.name)}</h2>${unitButtons}<div class="log-actions">${btn('both',`Poids + ${unitLabel}`)}${btn('weight','Poids')}${btn('reps',unit === 'seconds' ? 'Secondes' : 'Reps')}</div>${points.length ? svg : '<p class="empty">Pas encore de données.</p>'}<p class="chart-legend"><span style="color:#f2a65a">● Poids max (kg)</span> <span style="color:#7bd88f">● ${unit === 'seconds' ? 'Secondes totales' : 'Reps totales'}</span>${hasWeight ? '' : ' · aucun poids renseigné'}</p></div></section></div>`;
 }
 function render() {
   app.innerHTML = shell(state.page === 'library' ? library() : state.page === 'session' ? sessionPage() : state.page === 'generator' ? generatorPage() : state.page === 'tracking' ? trackingPage() : savedPage());
@@ -212,16 +216,18 @@ function submitLog() {
   const editingEntry = draft.entryIndex !== null;
   const entries = [];
   for (const entry of draft.entries) {
-    if (!entry.exerciseId && !entry.sets.some(set => set.reps !== '' || set.weight !== '')) continue;
+    if (!entry.exerciseId && !entry.sets.some(set => set.value !== '' || set.weight !== '')) continue;
     if (!entry.exerciseId) return notify('Choisissez un exercice de la liste pour chaque ligne.');
+    const unit = entry.unit === 'seconds' ? 'seconds' : 'reps';
+    const max = unit === 'seconds' ? 3600 : 999;
     const sets = [];
     for (const set of entry.sets) {
-      if (set.reps === '' && set.weight === '') continue;
-      const reps = Number(set.reps), weight = set.weight === '' ? null : Number(set.weight);
-      if (!Number.isInteger(reps) || reps < 1 || reps > 999 || (weight !== null && (!Number.isFinite(weight) || weight < 0 || weight > 1000))) return notify('Répétitions : 1 à 999. Poids : 0 à 1000 kg.');
-      sets.push({reps, weight});
+      if (set.value === '' && set.weight === '') continue;
+      const value = Number(set.value), weight = set.weight === '' ? null : Number(set.weight);
+      if (!Number.isInteger(value) || value < 1 || value > max || (weight !== null && (!Number.isFinite(weight) || weight < 0 || weight > 1000))) return notify(`${unit === 'seconds' ? 'Secondes' : 'Répétitions'} : 1 à ${max}. Poids : 0 à 1000 kg.`);
+      sets.push({[unit]:value, weight});
     }
-    if (sets.length) entries.push({exerciseId:entry.exerciseId, sets});
+    if (sets.length) entries.push({exerciseId:entry.exerciseId, unit, sets});
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date)) return notify('Choisissez une date.');
   if (!entries.length) return notify('Ajoutez au moins un exercice avec une série.');
@@ -249,17 +255,21 @@ function newLogDraft(name = '', entries = [{exerciseId:null, sets:[emptySet()]}]
   state.page = 'tracking';
 }
 function trackingEntries(items) {
-  return items.filter(item => item.exerciseId).map(item => ({
-    exerciseId:item.exerciseId,
-    sets:Array.from({length:item.sets}, () => ({reps:item.reps > 0 ? item.reps : '', weight:''}))
-  }));
+  return items.filter(item => item.exerciseId).map(item => {
+    const unit = trackingUnit(byId(item.exerciseId));
+    return {
+      exerciseId:item.exerciseId, unit,
+      sets:Array.from({length:item.sets}, () => ({value:unit === 'seconds' ? item.work : item.reps > 0 ? item.reps : '', weight:''}))
+    };
+  });
 }
 function editLogDraft(logId, entryIndex = null) {
   const log = state.logs.find(item => item.id === logId);
   if (!log) return;
   const draftEntry = entry => ({
     ...entry,
-    sets:entry.sets.map(set => ({reps:String(set.reps), weight:set.weight === null ? '' : String(set.weight)}))
+    unit:entryUnit(entry),
+    sets:entry.sets.map(set => ({value:String(set[entryUnit(entry)]), weight:set.weight === null ? '' : String(set.weight)}))
   });
   state.logDraft = {
     date:log.date,
@@ -376,8 +386,9 @@ app.addEventListener('click', event => {
     case 'log-add-set': state.logDraft.entries[index]?.sets.push(emptySet()); render(); break;
     case 'log-remove-set': state.logDraft.entries[index]?.sets.splice(Number(button.dataset.set),1); render(); break;
     case 'log-delete': if (confirm('Supprimer cette séance du suivi ?')) { state.logs = state.logs.filter(log => log.id !== id); if (state.logDraft?.logId === id) state.logDraft = null; persist(); render(); } break;
-    case 'chart': if (byId(id)) { state.chart = {id, metric:'both'}; render(); } break;
+    case 'chart': if (byId(id)) { state.chart = {id, metric:'both', unit:button.dataset.unit === 'seconds' ? 'seconds' : 'reps'}; render(); } break;
     case 'chart-metric': state.chart.metric = id; render(); break;
+    case 'chart-unit': state.chart.unit = id; render(); break;
     case 'close-chart': state.chart = null; render(); break;
     case 'log-from-runner': {
       const entries = trackingEntries(state.runner.items);
@@ -553,6 +564,14 @@ app.addEventListener('submit', event => {
   persist();
   render();
 });
+function updateLogUnitInputs(container, unit) {
+  const seconds = unit === 'seconds';
+  container.querySelectorAll('[data-field="value"]').forEach((input, index) => {
+    input.max = seconds ? '3600' : '999';
+    input.placeholder = seconds ? 'Secondes' : 'Reps';
+    input.setAttribute('aria-label', `${seconds ? 'Secondes' : 'Répétitions'} série ${index + 1}`);
+  });
+}
 app.addEventListener('change', event => {
   const target = event.target;
   if (target.id === 'session-file' && target.files.length) {
@@ -565,7 +584,17 @@ app.addEventListener('change', event => {
   if (state.logDraft && target.dataset.entryEx !== undefined) {
     const entry = state.logDraft.entries[Number(target.dataset.entryEx)];
     const match = exercises.find(e => e.name === target.value.trim());
+    if (match && entry.exerciseId !== match.id) entry.unit = trackingUnit(match);
     entry.exerciseId = match ? match.id : null; entry.text = target.value;
+    const container = target.closest('.log-entry');
+    container.querySelector('[data-entry-unit]').value = entry.unit || 'reps';
+    updateLogUnitInputs(container, entry.unit);
+    return;
+  }
+  if (state.logDraft && target.dataset.entryUnit !== undefined) {
+    const entry = state.logDraft.entries[Number(target.dataset.entryUnit)];
+    entry.unit = target.value;
+    updateLogUnitInputs(target.closest('.log-entry'), entry.unit);
     return;
   }
   if (state.logDraft && target.dataset.set !== undefined) {

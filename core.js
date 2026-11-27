@@ -3,6 +3,15 @@ import { equipmentFilterFor } from './equipment-audit.js';
 export const STORAGE_KEY = 'fitness-maker-v1';
 export const MAX_SETS = 999;
 
+export function trackingUnit(exercise) {
+  if (!exercise) return 'reps';
+  const name = exercise.name.toLowerCase();
+  return /\b(hold|isometric|static|pose|wall sit)\b/.test(name) ||
+    /\b(dead hang|flexed arm hang)\b/.test(name) ||
+    (/\bplank\b/.test(name) && !/\b(raises?|dips?|tuck|lift|to plank)\b/.test(name))
+    ? 'seconds' : 'reps';
+}
+
 export const BODY_PART_FILTERS = [
   {id:'back', label:'Dos', categories:['Dos'], muscles:['Dos','Grand dorsal','Haut du dos','Trapèzes']},
   {id:'abs', label:'Abdos', categories:['Abdominaux'], muscles:['Abdominaux']},
