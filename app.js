@@ -116,7 +116,7 @@ function generatorPage() {
   return `<div class="eyebrow"><span></span> SÉANCE AUTOMATIQUE</div><div class="heading-row"><div><h1>Une séance <em>sur mesure.</em></h1><p class="intro">Choisissez vos objectifs, puis personnalisez votre séance avant de commencer.</p></div><button class="secondary" data-page="session">Retour à ma séance</button></div>${generatorForm()}`;
 }
 function savedPage() {
-  return `<div class="eyebrow"><span></span> VOTRE COLLECTION</div><div class="heading-row"><div><h1>Vos séances, <em>à retrouver.</em></h1><p class="intro">Tous vos programmes enregistrés, prêts à être repris.</p></div><div class="collection-actions"><label class="secondary import-session">Importer un JSON<input id="session-file" type="file" accept=".json,application/json"></label><button class="primary" data-action="new">＋ Nouvelle séance</button></div></div><div class="saved-grid">${state.sessions.length ? state.sessions.map(session => `<article class="panel saved-card"><div class="eyebrow muted">SÉANCE ENREGISTRÉE</div><h2>${escapeHtml(session.name)}</h2><p>${session.items.length} bloc${session.items.length > 1 ? 's' : ''} · ${formatTime(makeTimeline(session.items).reduce((sum,phase) => sum + phase.duration,0))}</p><div class="tags">${session.items.slice(0,3).map(item => `<span>${escapeHtml(itemName(item))}</span>`).join('')}</div><div class="saved-actions"><button class="primary" data-action="load" data-id="${escapeHtml(session.id)}">Ouvrir ↗</button><button class="text-button" data-action="export-saved" data-id="${escapeHtml(session.id)}">Exporter JSON</button><button class="text-button danger" data-action="delete" data-id="${escapeHtml(session.id)}">Supprimer</button></div></article>`).join('') : '<div class="empty"><strong>Pas encore de séance enregistrée.</strong><p>Créez votre premier programme et retrouvez-le ici.</p><button class="secondary" data-page="library">Explorer les exercices ↗</button></div>'}</div>`;
+  return `<div class="eyebrow"><span></span> VOTRE COLLECTION</div><div class="heading-row"><div><h1>Vos séances, <em>à retrouver.</em></h1><p class="intro">Tous vos programmes enregistrés, prêts à être repris.</p></div><div class="collection-actions"><label class="secondary import-session">Importer un JSON<input id="session-file" type="file" accept=".json,application/json"></label><button class="primary" data-action="new">＋ Nouvelle séance</button></div></div><div class="saved-grid">${state.sessions.length ? state.sessions.map(session => `<article class="panel saved-card"><div class="eyebrow muted">SÉANCE ENREGISTRÉE</div><h2>${escapeHtml(session.name)}</h2><p>${session.items.length} bloc${session.items.length > 1 ? 's' : ''} · ${formatTime(makeTimeline(session.items).reduce((sum,phase) => sum + phase.duration,0))}</p><div class="tags">${session.items.slice(0,3).map(item => `<span>${escapeHtml(itemName(item))}</span>`).join('')}</div><div class="saved-actions"><button class="primary" data-action="load" data-id="${escapeHtml(session.id)}">Ouvrir ↗</button><button class="text-button" data-action="log-from-saved" data-id="${escapeHtml(session.id)}">Ajouter au suivi</button><button class="text-button" data-action="export-saved" data-id="${escapeHtml(session.id)}">Exporter JSON</button><button class="text-button danger" data-action="delete" data-id="${escapeHtml(session.id)}">Supprimer</button></div></article>`).join('') : '<div class="empty"><strong>Pas encore de séance enregistrée.</strong><p>Créez votre premier programme et retrouvez-le ici.</p><button class="secondary" data-page="library">Explorer les exercices ↗</button></div>'}</div>`;
 }
 function detailModal() {
   const exercise = byId(state.detail);
@@ -131,7 +131,7 @@ function runnerModal() {
   const total = runner.timeline.reduce((sum, item) => sum + item.duration, 0);
   const elapsed = done ? total : runner.timeline.slice(0,runner.index).reduce((sum, item) => sum + item.duration, 0) + phase.duration - runner.remaining;
   const upcoming = phase ? runner.items.slice(phase.itemIndex + 1) : [];
-  return `<div class="overlay runner-overlay"><section class="modal runner" role="dialog" aria-modal="true" aria-labelledby="runner-title"><button class="close" data-action="${done ? 'stop' : 'leave-runner'}" aria-label="${done ? 'Terminer la séance' : 'Quitter et reprendre plus tard'}">×</button><div class="eyebrow"><span></span> ${done ? 'SÉANCE TERMINÉE' : phase.type === 'work' ? 'C’EST À VOUS' : 'REPRENEZ VOTRE SOUFFLE'}</div><h2 id="runner-title">${done ? 'Bravo, vous l’avez fait !' : phase.type === 'work' ? escapeHtml(itemName(phase)) : 'Temps de repos'}</h2>${done ? '' : `<div class="runner-sets">${phase.type === 'work' ? `Série <strong>${phase.set} / ${phase.sets}</strong>` : `Séries terminées <strong>${phase.set} / ${phase.sets}</strong>`}</div>${phase.type === 'rest' && next ? `<p>À suivre : ${escapeHtml(itemName(next))} · série ${next.set} / ${next.sets}</p>` : ''}`}${exercise ? `<div class="runner-current">${exerciseImage(exercise,'runner-image')}<strong>${escapeHtml(exercise.name)}</strong><button class="text-button runner-detail" data-action="detail" data-id="${escapeHtml(exercise.id)}">Voir l’exercice ↗</button></div>` : ''}<div class="timer-ring ${phase?.type === 'rest' ? 'rest' : ''}"><span id="timer-display" role="timer">${formatTime(runner.remaining)}</span><small>${done ? 'BIEN JOUÉ' : runner.paused ? 'EN PAUSE' : phase.type === 'work' ? 'EFFORT' : 'REPOS'}</small></div><div class="runner-progress"><label for="session-progress">Progression de la séance ${done ? '· terminée' : `· bloc ${phase.itemIndex + 1} / ${runner.items.length}`}</label><progress id="session-progress" max="${total}" value="${elapsed}"></progress><small>Étape ${done ? runner.timeline.length : runner.index + 1} / ${runner.timeline.length}</small></div>${done ? '<button class="primary" data-action="log-from-runner">Ajouter au suivi</button><button class="secondary" data-action="stop">Terminer</button>' : `<div class="runner-actions"><button class="secondary" data-action="pause">${runner.paused ? '▶ Reprendre' : 'Ⅱ Pause'}</button><button class="text-button" data-action="skip">Passer ↗</button></div>${upcoming.length ? `<div class="runner-upcoming"><h3>Blocs suivants</h3><div class="upcoming-list">${upcoming.map(item => { const e = byId(item.exerciseId); return `<div class="upcoming-item">${e ? exerciseImage(e,'upcoming-image') : ''}<span>${escapeHtml(itemName(item))}</span></div>`; }).join('')}</div>` : ''}`}</section></div>`;
+  return `<div class="overlay runner-overlay"><section class="modal runner" role="dialog" aria-modal="true" aria-labelledby="runner-title"><button class="close" data-action="${done ? 'stop' : 'leave-runner'}" aria-label="${done ? 'Terminer la séance' : 'Quitter et reprendre plus tard'}">×</button><div class="eyebrow"><span></span> ${done ? 'SÉANCE TERMINÉE' : phase.type === 'work' ? 'C’EST À VOUS' : 'REPRENEZ VOTRE SOUFFLE'}</div><h2 id="runner-title">${done ? 'Bravo, vous l’avez fait !' : phase.type === 'work' ? escapeHtml(itemName(phase)) : 'Temps de repos'}</h2>${done ? '' : `<div class="runner-sets">${phase.type === 'work' ? `Série <strong>${phase.set} / ${phase.sets}</strong>` : `Séries terminées <strong>${phase.set} / ${phase.sets}</strong>`}</div>${phase.type === 'rest' && next ? `<p>À suivre : ${escapeHtml(itemName(next))} · série ${next.set} / ${next.sets}</p>` : ''}`}${exercise ? `<div class="runner-current">${exerciseImage(exercise,'runner-image')}<strong>${escapeHtml(exercise.name)}</strong><button class="text-button runner-detail" data-action="detail" data-id="${escapeHtml(exercise.id)}">Voir l’exercice ↗</button></div>` : ''}<div class="timer-ring ${phase?.type === 'rest' ? 'rest' : ''}"><span id="timer-display" role="timer">${formatTime(runner.remaining)}</span><small>${done ? 'BIEN JOUÉ' : runner.paused ? 'EN PAUSE' : phase.type === 'work' ? 'EFFORT' : 'REPOS'}</small></div><div class="runner-progress"><label for="session-progress">Progression de la séance ${done ? '· terminée' : `· bloc ${phase.itemIndex + 1} / ${runner.items.length}`}</label><progress id="session-progress" max="${total}" value="${elapsed}"></progress><small>Étape ${done ? runner.timeline.length : runner.index + 1} / ${runner.timeline.length}</small></div>${done ? '<button class="primary" data-action="log-from-runner">Ajouter au suivi</button><button class="secondary" data-action="stop">Terminer</button>' : `<div class="runner-actions"><button class="secondary" data-action="pause">${runner.paused ? '▶ Reprendre' : 'Ⅱ Pause'}</button><button class="text-button" data-action="skip">Passer l’étape ↗</button><button class="text-button" data-action="skip-exercise">Passer l’exercice ↗</button></div>${upcoming.length ? `<div class="runner-upcoming"><h3>Blocs suivants</h3><div class="upcoming-list">${upcoming.map(item => { const e = byId(item.exerciseId); return `<div class="upcoming-item">${e ? exerciseImage(e,'upcoming-image') : ''}<span>${escapeHtml(itemName(item))}</span></div>`; }).join('')}</div>` : ''}`}</section></div>`;
 }
 let exerciseOptions;
 const exerciseDatalist = () => exerciseOptions ||= `<datalist id="exercise-names">${exercises.map(e => `<option value="${escapeHtml(e.name)}"></option>`).join('')}</datalist>`;
@@ -241,6 +241,12 @@ function newLogDraft(name = '', entries = [{exerciseId:null, sets:[emptySet()]}]
   state.logDraft = {date:today(), name, entries, logId:null, entryIndex:null};
   state.page = 'tracking';
 }
+function trackingEntries(items) {
+  return items.filter(item => item.exerciseId).map(item => ({
+    exerciseId:item.exerciseId,
+    sets:Array.from({length:item.sets}, () => ({reps:item.reps > 0 ? item.reps : '', weight:''}))
+  }));
+}
 function editLogDraft(logId, entryIndex = null) {
   const log = state.logs.find(item => item.id === logId);
   if (!log) return;
@@ -311,6 +317,17 @@ function announcePhase() {
   else if (phase.type === 'rest') speak('Pause, prenez votre souffle.');
   else speak(`C'est parti ! ${itemName(phase)}`);
 }
+function advanceRunner(index) {
+  const runner = state.runner;
+  if (!runner) return;
+  runner.index = Math.min(index, runner.timeline.length);
+  runner.elapsed = runner.timeline.slice(0,runner.index).reduce((sum,phase) => sum + phase.duration,0);
+  runner.startedAt = Date.now();
+  runner.remaining = runner.timeline[runner.index]?.duration || 0;
+  announcePhase();
+  persist();
+  render();
+}
 function tick() {
   const r = state.runner;
   if (!r || r.paused) return;
@@ -353,10 +370,17 @@ app.addEventListener('click', event => {
     case 'chart-metric': state.chart.metric = id; render(); break;
     case 'close-chart': state.chart = null; render(); break;
     case 'log-from-runner': {
-      const entries = state.runner.items.filter(item => item.exerciseId).map(item => ({exerciseId:item.exerciseId, sets:Array.from({length:item.sets}, emptySet)}));
+      const entries = trackingEntries(state.runner.items);
       clearInterval(timerId); state.runner = null; state.resumeRunner = null;
       newLogDraft(state.draft.name, entries.length ? entries : undefined);
       persist(); render(); window.scrollTo(0,0); break;
+    }
+    case 'log-from-saved': {
+      const session = state.sessions.find(item => item.id === id);
+      if (!session) break;
+      const entries = trackingEntries(session.items);
+      newLogDraft(session.name, entries.length ? entries : undefined);
+      render(); window.scrollTo(0,0); break;
     }
     case 'dismiss': warning = ''; render(); break;
     case 'sound': state.sound = !state.sound; if (!state.sound && 'speechSynthesis' in window) window.speechSynthesis.cancel(); persist(); render(); break;
@@ -447,11 +471,14 @@ app.addEventListener('click', event => {
     }
     case 'skip': {
       const r = state.runner;
-      r.index++;
-      r.elapsed = r.timeline.slice(0,r.index).reduce((sum,phase) => sum + phase.duration,0);
-      r.startedAt = Date.now();
-      r.remaining = r.timeline[r.index]?.duration || 0;
-      announcePhase(); persist(); render(); break;
+      advanceRunner(r.index + 1); break;
+    }
+    case 'skip-exercise': {
+      const r = state.runner;
+      const phase = r.timeline[r.index];
+      if (!phase) break;
+      const nextIndex = r.timeline.findIndex((item,i) => i > r.index && item.itemIndex > phase.itemIndex);
+      advanceRunner(nextIndex === -1 ? r.timeline.length : nextIndex); break;
     }
     case 'leave-runner':
       clearInterval(timerId);
