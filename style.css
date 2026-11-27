@@ -104,10 +104,19 @@
 .item-fields .stepper input{flex:1;min-width:0}
 @media(max-width:600px){.session-item{gap:10px;padding:12px}.session-item .item-image{min-height:360px}.item-buttons{grid-column:2;justify-self:end;gap:4px}.item-buttons button{width:32px;height:36px}.item-replacements{flex-direction:column}.item-replacements .replace-button{width:100%;padding:10px 6px;font-size:11px}.session-item .item-fields{gap:8px}.item-fields .stepper button{min-width:24px}.item-fields .stepper input{min-width:25px}}
 @media(max-width:360px){.item-number{width:28px;height:32px}.item-buttons{gap:2px}.item-buttons button{width:28px}}
-.session-add{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:12px}
+.session-add{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px}
+.session-heading-actions{display:flex;align-items:center;gap:12px}
+.session-utility-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.session-utility-actions .full{margin-top:0;padding:13px 8px;white-space:nowrap}
+.session-add-button{font-size:13px;padding:14px 18px;white-space:nowrap}
+.clear-session-button{white-space:nowrap;border-color:#69423e}
+.clear-session-button:hover:not(:disabled){border-color:#e9a29e}
 .timer-item{display:block}
 .timer-item .item-heading,.timer-item .item-main{display:flex}
 .timer-item .item-heading{align-items:center;gap:16px}
 .timer-item .item-title{flex:1}
 .timer-item .item-fields{display:flex;flex-wrap:wrap}
-@media(max-width:600px){.session-add{justify-content:flex-start}.session-title{align-items:flex-start;flex-direction:column}.timer-item .item-heading{flex-wrap:wrap}.timer-item .item-buttons{margin-left:auto}.timer-item .item-fields label{flex:1;min-width:80px}}
+@media(max-width:600px){.session-heading-actions{width:100%;align-items:stretch;flex-direction:column}.clear-session-button{align-self:flex-end}.session-add{justify-content:flex-start;width:100%}.session-add-button{flex:1 1 100%;text-align:center}.session-title{align-items:flex-start;flex-direction:column}.timer-item .item-heading{flex-wrap:wrap}.timer-item .item-buttons{margin-left:auto}.timer-item .item-fields label{flex:1;min-width:80px}}
+footer{display:grid;gap:6px;line-height:1.5}
+.footer-dedication{color:#aab5a6;font-weight:600}
+.footer-heart{color:#c7868c;font-size:13px;margin-left:2px}

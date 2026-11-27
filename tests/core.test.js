@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { exercises, exerciseById, EQUIPMENT_GROUPS } from '../exercises.js';
 import { EQUIPMENT_FILTERS, equipmentFilterFor } from '../equipment-audit.js';
 import data from '../repdb-data.js';
-import { BODY_PART_FILTERS, matchesExercise, generateSession, automaticReplacement, recommend, validateItem, exportSession, importSession, makeTimeline, locatePhase, formatTime } from '../core.js';
+import { BODY_PART_FILTERS, matchesExercise, generateSession, automaticReplacement, recommend, validateItem, exportSession, importSession, makeTimeline, locatePhase, formatTime, MAX_SETS } from '../core.js';
 
 test('catalogue RepDB complet et séances précédentes conservées', () => {
   assert.equal(exercises.length, 708);
@@ -59,6 +59,9 @@ test('chronomètre : limites de phase et dépassement après inactivité', () =>
 test('validation des paramètres', () => {
   const item = {exerciseId:'a',sets:1,work:5,rest:0};
   assert.ok(validateItem(item));
+  assert.ok(validateItem({...item,sets:11}));
+  assert.ok(validateItem({...item,sets:MAX_SETS}));
+  assert.ok(!validateItem({...item,sets:MAX_SETS + 1}));
   assert.ok(!validateItem({...item,work:4}));
   assert.ok(!validateItem({...item,sets:1.5}));
   assert.ok(!validateItem({...item,rest:301}));
