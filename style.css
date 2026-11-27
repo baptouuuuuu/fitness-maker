@@ -104,3 +104,10 @@
 .item-fields .stepper input{flex:1;min-width:0}
 @media(max-width:600px){.session-item{gap:10px;padding:12px}.session-item .item-image{min-height:360px}.item-buttons{grid-column:2;justify-self:end;gap:4px}.item-buttons button{width:32px;height:36px}.item-replacements{flex-direction:column}.item-replacements .replace-button{width:100%;padding:10px 6px;font-size:11px}.session-item .item-fields{gap:8px}.item-fields .stepper button{min-width:24px}.item-fields .stepper input{min-width:25px}}
 @media(max-width:360px){.item-number{width:28px;height:32px}.item-buttons{gap:2px}.item-buttons button{width:28px}}
+.session-add{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:12px}
+.timer-item{display:block}
+.timer-item .item-heading,.timer-item .item-main{display:flex}
+.timer-item .item-heading{align-items:center;gap:16px}
+.timer-item .item-title{flex:1}
+.timer-item .item-fields{display:flex;flex-wrap:wrap}
+@media(max-width:600px){.session-add{justify-content:flex-start}.session-title{align-items:flex-start;flex-direction:column}.timer-item .item-heading{flex-wrap:wrap}.timer-item .item-buttons{margin-left:auto}.timer-item .item-fields label{flex:1;min-width:80px}}
