@@ -27,11 +27,15 @@ function restoreRunner(savedRunner) {
   const phase = locatePhase(timeline, savedRunner.elapsed);
   return {timeline, items, index:phase.index, remaining:phase.remaining, elapsed:savedRunner.elapsed, startedAt:0, paused:true};
 }
+const validLog = log => log && typeof log.id === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(log.date) && typeof log.name === 'string' && Array.isArray(log.entries) && log.entries.every(entry => entry && byId(entry.exerciseId) && Array.isArray(entry.sets) && entry.sets.every(set => Number.isFinite(set.reps) && set.reps > 0 && (set.weight === null || Number.isFinite(set.weight))));
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const formatDate = date => new Date(`${date}T12:00:00`).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
 const state = {
   page:'library', search:'', bodyParts:[], equipmentGroups:['mat'], types:['strength'], sort:'name', onlyFavorites:false, limit:24,
   favorites:Array.isArray(saved.favorites) ? saved.favorites.filter(id => byId(id)) : [],
   sessions:Array.isArray(saved.sessions) ? saved.sessions.filter(session => session && typeof session.id === 'string' && typeof session.name === 'string' && validItems(session.items)) : [],
   draft:saved.draft && typeof saved.draft.name === 'string' && validItems(saved.draft.items) ? saved.draft : {id:null, name:'Ma séance', items:[]},
+  logs:Array.isArray(saved.logs) ? saved.logs.filter(validLog) : [], logDraft:null, chart:null,
   sound:saved.sound !== false, detail:null, runner:null, resumeRunner:restoreRunner(saved.runner), replaceIndex:null,
   generatorMinutes:'20', generatorFilters:{search:'', bodyParts:[], equipmentGroups:['mat'], types:['strength']}
 };
@@ -44,7 +48,7 @@ function showDetail(id) {
 function persist() {
   try {
     const runner = state.runner ? snapshotRunner(state.runner) : state.resumeRunner ? snapshotRunner(state.resumeRunner) : null;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({favorites:state.favorites, sessions:state.sessions, draft:state.draft, sound:state.sound, runner}));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({favorites:state.favorites, sessions:state.sessions, logs:state.logs, draft:state.draft, sound:state.sound, runner}));
   } catch {
     warning = 'Enregistrement impossible : le stockage local est indisponible ou plein.';
   }
@@ -72,7 +76,7 @@ function navButton(page, icon, label) {
   return `<button class="nav-link ${state.page === page ? 'active' : ''}" data-page="${page}" ${state.page === page ? 'aria-current="page"' : ''}><span aria-hidden="true">${icon}</span>${label}${page === 'session' ? `<span class="nav-count">${state.draft.items.length}</span>` : ''}</button>`;
 }
 function shell(content) {
-  return `<div class="layout"><aside class="sidebar"><div class="brand"><span class="brand-mark">✳</span><div>fitness<span>maker</span><small>VOTRE ESPACE À VOUS</small></div></div><div class="nav-label">ESPACE PERSONNEL</div><nav aria-label="Navigation principale">${navButton('library','▦','Bibliothèque')}${navButton('session','◫','Ma séance')}${navButton('generator','✦','Générateur')}${navButton('saved','♡','Mes séances')}</nav><div class="sidebar-bottom"><span>✦</span><div><strong>À votre rythme.</strong><p>Chaque mouvement compte.</p></div></div></aside><main><header class="topbar"><span>VOTRE ESPACE FITNESS</span><button class="sound-toggle" data-action="sound" aria-pressed="${state.sound}">${state.sound ? '♪ Son activé' : '♪ Son désactivé'}</button></header>${warning ? `<div class="notice" role="alert">${escapeHtml(warning)} <button data-action="dismiss" aria-label="Fermer">×</button></div>` : ''}<div class="content">${content}</div><footer><div class="footer-dedication">Conçu pour Romane <span class="footer-heart" aria-hidden="true">♡</span></div><div>Bougez avec plaisir, cultivez votre énergie et prenez soin de vous.</div><div>Images des exercices : <a href="https://repdb.co" target="_blank" rel="noopener noreferrer">RepDB</a></div></footer></main></div>${state.detail ? detailModal() : ''}${state.runner ? runnerModal() : ''}`;
+  return `<div class="layout"><aside class="sidebar"><div class="brand"><span class="brand-mark">✳</span><div>fitness<span>maker</span><small>VOTRE ESPACE À VOUS</small></div></div><div class="nav-label">ESPACE PERSONNEL</div><nav aria-label="Navigation principale">${navButton('library','▦','Bibliothèque')}${navButton('session','◫','Ma séance')}${navButton('generator','✦','Générateur')}${navButton('saved','♡','Mes séances')}${navButton('tracking','↗','Suivi')}</nav><div class="sidebar-bottom"><span>✦</span><div><strong>À votre rythme.</strong><p>Chaque mouvement compte.</p></div></div></aside><main><header class="topbar"><span>VOTRE ESPACE FITNESS</span><button class="sound-toggle" data-action="sound" aria-pressed="${state.sound}">${state.sound ? '♪ Son activé' : '♪ Son désactivé'}</button></header>${warning ? `<div class="notice" role="alert">${escapeHtml(warning)} <button data-action="dismiss" aria-label="Fermer">×</button></div>` : ''}<div class="content">${content}</div><footer><div class="footer-dedication">Conçu pour Romane <span class="footer-heart" aria-hidden="true">♡</span></div><div>Bougez avec plaisir, cultivez votre énergie et prenez soin de vous.</div><div>Images des exercices : <a href="https://repdb.co" target="_blank" rel="noopener noreferrer">RepDB</a></div></footer></main></div>${state.detail ? detailModal() : ''}${state.chart ? chartModal() : ''}${state.runner ? runnerModal() : ''}`;
 }
 function filtersUI(filters, scope) {
   return `<div class="filters"><label class="search"><span aria-hidden="true">⌕</span><input type="search" data-search="${scope}" placeholder="Rechercher en français ou en anglais..." value="${escapeHtml(filters.search)}" aria-label="Rechercher un exercice ou un muscle"></label></div><fieldset class="equipment-filters"><legend>Parties du corps <small>— plusieurs choix possibles</small></legend><div class="keyword-list">${BODY_PART_FILTERS.map(({id,label}) => `<label><input type="checkbox" data-body-part="${scope}" value="${id}" ${filters.bodyParts.includes(id) ? 'checked' : ''}> ${label}</label>`).join('')}</div><small>Sans sélection : toutes les parties du corps.</small></fieldset><fieldset class="equipment-filters"><legend>Type d’exercice <small>— plusieurs choix possibles</small></legend><div class="keyword-list">${[['strength','Renforcement'],['stretching','Étirement'],['mobility','Mobilité']].map(([value,label]) => `<label><input type="checkbox" data-exercise-type="${scope}" value="${value}" ${filters.types.includes(value) ? 'checked' : ''}> ${label}</label>`).join('')}</div><small>Sans sélection : tous les types d’exercice.</small></fieldset><fieldset class="equipment-filters"><legend>Matériel disponible <small>— plusieurs choix possibles</small></legend><div class="keyword-list">${EQUIPMENT_FILTERS.map(([value,label]) => `<label><input type="checkbox" data-equipment-group="${scope}" value="${value}" ${filters.equipmentGroups.includes(value) ? 'checked' : ''}> ${label}</label>`).join('')}</div><small>Sans sélection : exercices sans matériel. Seuls les exercices compatibles avec votre matériel sont affichés ; le tapis est facultatif. Machines regroupe les autres équipements de salle.</small></fieldset>`;
@@ -127,10 +131,57 @@ function runnerModal() {
   const total = runner.timeline.reduce((sum, item) => sum + item.duration, 0);
   const elapsed = done ? total : runner.timeline.slice(0,runner.index).reduce((sum, item) => sum + item.duration, 0) + phase.duration - runner.remaining;
   const upcoming = phase ? runner.items.slice(phase.itemIndex + 1) : [];
-  return `<div class="overlay runner-overlay"><section class="modal runner" role="dialog" aria-modal="true" aria-labelledby="runner-title"><button class="close" data-action="${done ? 'stop' : 'leave-runner'}" aria-label="${done ? 'Terminer la séance' : 'Quitter et reprendre plus tard'}">×</button><div class="eyebrow"><span></span> ${done ? 'SÉANCE TERMINÉE' : phase.type === 'work' ? 'C’EST À VOUS' : 'REPRENEZ VOTRE SOUFFLE'}</div><h2 id="runner-title">${done ? 'Bravo, vous l’avez fait !' : phase.type === 'work' ? escapeHtml(itemName(phase)) : 'Temps de repos'}</h2>${done ? '' : `<div class="runner-sets">${phase.type === 'work' ? `Série <strong>${phase.set} / ${phase.sets}</strong>` : `Séries terminées <strong>${phase.set} / ${phase.sets}</strong>`}</div>${phase.type === 'rest' && next ? `<p>À suivre : ${escapeHtml(itemName(next))} · série ${next.set} / ${next.sets}</p>` : ''}`}${exercise ? `<div class="runner-current">${exerciseImage(exercise,'runner-image')}<strong>${escapeHtml(exercise.name)}</strong><button class="text-button runner-detail" data-action="detail" data-id="${escapeHtml(exercise.id)}">Voir l’exercice ↗</button></div>` : ''}<div class="timer-ring ${phase?.type === 'rest' ? 'rest' : ''}"><span id="timer-display" role="timer">${formatTime(runner.remaining)}</span><small>${done ? 'BIEN JOUÉ' : runner.paused ? 'EN PAUSE' : phase.type === 'work' ? 'EFFORT' : 'REPOS'}</small></div><div class="runner-progress"><label for="session-progress">Progression de la séance ${done ? '· terminée' : `· bloc ${phase.itemIndex + 1} / ${runner.items.length}`}</label><progress id="session-progress" max="${total}" value="${elapsed}"></progress><small>Étape ${done ? runner.timeline.length : runner.index + 1} / ${runner.timeline.length}</small></div>${done ? '<button class="primary" data-action="stop">Terminer</button>' : `<div class="runner-actions"><button class="secondary" data-action="pause">${runner.paused ? '▶ Reprendre' : 'Ⅱ Pause'}</button><button class="text-button" data-action="skip">Passer ↗</button></div>${upcoming.length ? `<div class="runner-upcoming"><h3>Blocs suivants</h3><div class="upcoming-list">${upcoming.map(item => { const e = byId(item.exerciseId); return `<div class="upcoming-item">${e ? exerciseImage(e,'upcoming-image') : ''}<span>${escapeHtml(itemName(item))}</span></div>`; }).join('')}</div>` : ''}`}</section></div>`;
+  return `<div class="overlay runner-overlay"><section class="modal runner" role="dialog" aria-modal="true" aria-labelledby="runner-title"><button class="close" data-action="${done ? 'stop' : 'leave-runner'}" aria-label="${done ? 'Terminer la séance' : 'Quitter et reprendre plus tard'}">×</button><div class="eyebrow"><span></span> ${done ? 'SÉANCE TERMINÉE' : phase.type === 'work' ? 'C’EST À VOUS' : 'REPRENEZ VOTRE SOUFFLE'}</div><h2 id="runner-title">${done ? 'Bravo, vous l’avez fait !' : phase.type === 'work' ? escapeHtml(itemName(phase)) : 'Temps de repos'}</h2>${done ? '' : `<div class="runner-sets">${phase.type === 'work' ? `Série <strong>${phase.set} / ${phase.sets}</strong>` : `Séries terminées <strong>${phase.set} / ${phase.sets}</strong>`}</div>${phase.type === 'rest' && next ? `<p>À suivre : ${escapeHtml(itemName(next))} · série ${next.set} / ${next.sets}</p>` : ''}`}${exercise ? `<div class="runner-current">${exerciseImage(exercise,'runner-image')}<strong>${escapeHtml(exercise.name)}</strong><button class="text-button runner-detail" data-action="detail" data-id="${escapeHtml(exercise.id)}">Voir l’exercice ↗</button></div>` : ''}<div class="timer-ring ${phase?.type === 'rest' ? 'rest' : ''}"><span id="timer-display" role="timer">${formatTime(runner.remaining)}</span><small>${done ? 'BIEN JOUÉ' : runner.paused ? 'EN PAUSE' : phase.type === 'work' ? 'EFFORT' : 'REPOS'}</small></div><div class="runner-progress"><label for="session-progress">Progression de la séance ${done ? '· terminée' : `· bloc ${phase.itemIndex + 1} / ${runner.items.length}`}</label><progress id="session-progress" max="${total}" value="${elapsed}"></progress><small>Étape ${done ? runner.timeline.length : runner.index + 1} / ${runner.timeline.length}</small></div>${done ? '<button class="primary" data-action="log-from-runner">Ajouter au suivi</button><button class="secondary" data-action="stop">Terminer</button>' : `<div class="runner-actions"><button class="secondary" data-action="pause">${runner.paused ? '▶ Reprendre' : 'Ⅱ Pause'}</button><button class="text-button" data-action="skip">Passer ↗</button></div>${upcoming.length ? `<div class="runner-upcoming"><h3>Blocs suivants</h3><div class="upcoming-list">${upcoming.map(item => { const e = byId(item.exerciseId); return `<div class="upcoming-item">${e ? exerciseImage(e,'upcoming-image') : ''}<span>${escapeHtml(itemName(item))}</span></div>`; }).join('')}</div>` : ''}`}</section></div>`;
+}
+let exerciseOptions;
+const exerciseDatalist = () => exerciseOptions ||= `<datalist id="exercise-names">${exercises.map(e => `<option value="${escapeHtml(e.name)}"></option>`).join('')}</datalist>`;
+const emptySet = () => ({reps:'', weight:''});
+function logForm() {
+  const draft = state.logDraft;
+  return `<form class="panel log-form" id="log-form"><h2>Nouvelle séance</h2><div class="generator-fields"><label>Date<input type="date" data-log="date" value="${escapeHtml(draft.date)}" max="${today()}"></label><label>Nom<input type="text" data-log="name" maxlength="80" value="${escapeHtml(draft.name)}"></label></div>${exerciseDatalist()}${draft.entries.map((entry,i) => `<div class="log-entry"><div class="log-entry-head"><input type="text" list="exercise-names" placeholder="Exercice…" data-entry-ex="${i}" value="${entry.exerciseId ? escapeHtml(byId(entry.exerciseId).name) : escapeHtml(entry.text || '')}" aria-label="Exercice"><button type="button" class="text-button" data-action="log-remove-entry" data-index="${i}">Retirer</button></div>${entry.sets.map((set,j) => `<div class="log-set"><span>Série ${j+1}</span><input type="number" min="1" max="999" step="1" inputmode="numeric" placeholder="Reps" data-entry="${i}" data-set="${j}" data-field="reps" value="${escapeHtml(set.reps)}" aria-label="Répétitions série ${j+1}"><input type="number" min="0" max="1000" step="0.5" inputmode="decimal" placeholder="Poids (kg)" data-entry="${i}" data-set="${j}" data-field="weight" value="${escapeHtml(set.weight)}" aria-label="Poids série ${j+1}"><button type="button" class="text-button" data-action="log-remove-set" data-index="${i}" data-set="${j}" aria-label="Retirer la série ${j+1}">×</button></div>`).join('')}<button type="button" class="text-button" data-action="log-add-set" data-index="${i}">+ Série</button></div>`).join('')}<div class="log-actions"><button type="button" class="secondary" data-action="log-add-entry">+ Exercice</button><button type="submit" class="primary">Enregistrer</button><button type="button" class="text-button" data-action="log-cancel">Annuler</button></div></form>`;
+}
+function trackingPage() {
+  const logs = [...state.logs].sort((a,b) => b.date.localeCompare(a.date));
+  return `<div class="eyebrow"><span></span> VOTRE PROGRESSION</div><div class="heading-row"><div><h1>Suivi de vos <em>séances.</em></h1><p class="intro">Notez vos répétitions et vos charges, même pour les séances faites hors de l’application.</p></div>${state.logDraft ? '' : '<button class="primary" data-action="log-new">＋ Ajouter une séance</button>'}</div>${state.logDraft ? logForm() : ''}<section class="log-list">${logs.length ? logs.map(log => `<article class="panel log-card"><div class="log-card-head"><div><strong>${escapeHtml(log.name)}</strong><small>${formatDate(log.date)}</small></div><button class="secondary danger" data-action="log-delete" data-id="${escapeHtml(log.id)}">Supprimer</button></div>${log.entries.map(entry => `<div class="log-line"><div><strong>${escapeHtml(byId(entry.exerciseId).name)}</strong><span>${entry.sets.map(set => `${set.reps}${set.weight !== null ? ` × ${set.weight} kg` : ' reps'}`).join(' · ')}</span></div><button class="text-button" data-action="chart" data-id="${escapeHtml(entry.exerciseId)}">Voir le graphique ↗</button></div>`).join('')}</article>`).join('') : '<p class="empty">Aucune séance suivie pour l’instant.</p>'}</section>`;
+}
+function exerciseHistory(id) {
+  return state.logs.map(log => {
+    const sets = log.entries.filter(entry => entry.exerciseId === id).flatMap(entry => entry.sets);
+    if (!sets.length) return null;
+    const weights = sets.filter(set => set.weight !== null).map(set => set.weight);
+    return {date:log.date, reps:sets.reduce((sum,set) => sum + set.reps, 0), weight:weights.length ? Math.max(...weights) : null};
+  }).filter(Boolean).sort((a,b) => a.date.localeCompare(b.date));
+}
+function chartSvg(points, metric, color, side) {
+  const W = 520, H = 240, L = 48, R = 48, T = 16, B = 36;
+  const data = points.filter(p => p[metric] !== null);
+  if (!data.length) return '';
+  const times = points.map(p => new Date(`${p.date}T12:00:00`).getTime());
+  const t0 = Math.min(...times), t1 = Math.max(...times);
+  const values = data.map(p => p[metric]);
+  let lo = Math.min(...values), hi = Math.max(...values);
+  if (lo === hi) { lo = Math.max(0, lo - 1); hi += 1; }
+  const x = p => L + (t1 === t0 ? (W - L - R) / 2 : (new Date(`${p.date}T12:00:00`).getTime() - t0) / (t1 - t0) * (W - L - R));
+  const y = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  const ax = side === 'left' ? L : W - R;
+  const anchor = side === 'left' ? 'end' : 'start';
+  const dx = side === 'left' ? -6 : 6;
+  const ticks = [lo, (lo + hi) / 2, hi];
+  return `<g>${ticks.map(v => `<text x="${ax + dx}" y="${y(v) + 4}" text-anchor="${anchor}" fill="${color}" font-size="11">${Math.round(v * 10) / 10}</text>`).join('')}<polyline fill="none" stroke="${color}" stroke-width="2" points="${data.map(p => `${x(p)},${y(p[metric])}`).join(' ')}"/>${data.map(p => `<circle cx="${x(p)}" cy="${y(p[metric])}" r="4" fill="${color}"><title>${formatDate(p.date)} : ${p[metric]}</title></circle>`).join('')}</g>`;
+}
+function chartModal() {
+  const exercise = byId(state.chart.id);
+  const metric = state.chart.metric;
+  const points = exerciseHistory(state.chart.id);
+  const W = 520, H = 240, L = 48, R = 48, T = 16, B = 36;
+  const showWeight = metric !== 'reps', showReps = metric !== 'weight';
+  const hasWeight = points.some(p => p.weight !== null);
+  const svg = `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Évolution de ${escapeHtml(exercise.name)}"><line x1="${L}" y1="${T}" x2="${L}" y2="${H - B}" stroke="#555"/><line x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}" stroke="#555"/><line x1="${W - R}" y1="${T}" x2="${W - R}" y2="${H - B}" stroke="#555"/><text x="${L}" y="${H - 12}" font-size="11" fill="#aaa">${formatDate(points[0].date)}</text><text x="${W - R}" y="${H - 12}" font-size="11" text-anchor="end" fill="#aaa">${points.length > 1 ? formatDate(points[points.length - 1].date) : ''}</text>${showWeight ? chartSvg(points,'weight','#f2a65a','left') : ''}${showReps ? chartSvg(points,'reps','#7bd88f','right') : ''}</svg>`;
+  const btn = (value,label) => `<button class="${metric === value ? 'primary' : 'secondary'}" data-action="chart-metric" data-id="${value}" aria-pressed="${metric === value}">${label}</button>`;
+  return `<div class="overlay detail-overlay"><section class="modal chart-modal" role="dialog" aria-modal="true" aria-labelledby="chart-title"><button class="close" data-action="close-chart" aria-label="Fermer">×</button><div class="detail-content"><h2 id="chart-title">${escapeHtml(exercise.name)}</h2><div class="log-actions">${btn('both','Poids + reps')}${btn('weight','Poids')}${btn('reps','Reps')}</div>${points.length ? svg : '<p class="empty">Pas encore de données.</p>'}<p class="chart-legend"><span style="color:#f2a65a">● Poids max (kg)</span> <span style="color:#7bd88f">● Reps totales</span>${hasWeight ? '' : ' · aucun poids renseigné'}</p></div></section></div>`;
 }
 function render() {
-  app.innerHTML = shell(state.page === 'library' ? library() : state.page === 'session' ? sessionPage() : state.page === 'generator' ? generatorPage() : savedPage());
+  app.innerHTML = shell(state.page === 'library' ? library() : state.page === 'session' ? sessionPage() : state.page === 'generator' ? generatorPage() : state.page === 'tracking' ? trackingPage() : savedPage());
 }
 function add(id) {
   if (!byId(id)) return;
@@ -146,6 +197,33 @@ function add(id) {
   state.detail = null;
   persist();
   render();
+}
+function submitLog() {
+  const draft = state.logDraft;
+  const entries = [];
+  for (const entry of draft.entries) {
+    if (!entry.exerciseId && !entry.sets.some(set => set.reps !== '' || set.weight !== '')) continue;
+    if (!entry.exerciseId) return notify('Choisissez un exercice de la liste pour chaque ligne.');
+    const sets = [];
+    for (const set of entry.sets) {
+      if (set.reps === '' && set.weight === '') continue;
+      const reps = Number(set.reps), weight = set.weight === '' ? null : Number(set.weight);
+      if (!Number.isInteger(reps) || reps < 1 || reps > 999 || (weight !== null && (!Number.isFinite(weight) || weight < 0 || weight > 1000))) return notify('Répétitions : 1 à 999. Poids : 0 à 1000 kg.');
+      sets.push({reps, weight});
+    }
+    if (sets.length) entries.push({exerciseId:entry.exerciseId, sets});
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date)) return notify('Choisissez une date.');
+  if (!entries.length) return notify('Ajoutez au moins un exercice avec une série.');
+  state.logs.push({id:uid(), date:draft.date, name:draft.name.trim().slice(0,80) || 'Séance', entries});
+  state.logDraft = null;
+  warning = '';
+  persist();
+  notify(warning || 'Séance ajoutée au suivi.');
+}
+function newLogDraft(name = '', entries = [{exerciseId:null, sets:[emptySet()]}]) {
+  state.logDraft = {date:today(), name, entries};
+  state.page = 'tracking';
 }
 function save() {
   if (!state.draft.items.length) return notify('Ajoutez un exercice ou un chrono avant d’enregistrer.');
@@ -231,6 +309,22 @@ app.addEventListener('click', event => {
   const {action,id} = button.dataset;
   const index = Number(button.dataset.index);
   switch (action) {
+    case 'log-new': newLogDraft(); render(); break;
+    case 'log-cancel': state.logDraft = null; render(); break;
+    case 'log-add-entry': state.logDraft.entries.push({exerciseId:null, sets:[emptySet()]}); render(); break;
+    case 'log-remove-entry': state.logDraft.entries.splice(index,1); render(); break;
+    case 'log-add-set': state.logDraft.entries[index]?.sets.push(emptySet()); render(); break;
+    case 'log-remove-set': state.logDraft.entries[index]?.sets.splice(Number(button.dataset.set),1); render(); break;
+    case 'log-delete': if (confirm('Supprimer cette séance du suivi ?')) { state.logs = state.logs.filter(log => log.id !== id); persist(); render(); } break;
+    case 'chart': if (byId(id)) { state.chart = {id, metric:'both'}; render(); } break;
+    case 'chart-metric': state.chart.metric = id; render(); break;
+    case 'close-chart': state.chart = null; render(); break;
+    case 'log-from-runner': {
+      const entries = state.runner.items.filter(item => item.exerciseId).map(item => ({exerciseId:item.exerciseId, sets:Array.from({length:item.sets}, emptySet)}));
+      clearInterval(timerId); state.runner = null; state.resumeRunner = null;
+      newLogDraft(state.draft.name, entries.length ? entries : undefined);
+      persist(); render(); window.scrollTo(0,0); break;
+    }
     case 'dismiss': warning = ''; render(); break;
     case 'sound': state.sound = !state.sound; if (!state.sound && 'speechSynthesis' in window) window.speechSynthesis.cancel(); persist(); render(); break;
     case 'filter-favorites': state.onlyFavorites = !state.onlyFavorites; state.limit = 24; render(); break;
@@ -346,6 +440,7 @@ app.addEventListener('input', event => {
   } else if (event.target.id === 'generator-minutes') state.generatorMinutes = event.target.value;
 });
 app.addEventListener('submit', event => {
+  if (event.target.id === 'log-form') { event.preventDefault(); submitLog(); return; }
   if (event.target.id !== 'generator') return;
   event.preventDefault();
   let items;
@@ -363,6 +458,17 @@ app.addEventListener('change', event => {
     const file = target.files[0];
     target.value = '';
     loadSessionFile(file);
+    return;
+  }
+  if (state.logDraft && target.dataset.log) { state.logDraft[target.dataset.log] = target.value; return; }
+  if (state.logDraft && target.dataset.entryEx !== undefined) {
+    const entry = state.logDraft.entries[Number(target.dataset.entryEx)];
+    const match = exercises.find(e => e.name === target.value.trim());
+    entry.exerciseId = match ? match.id : null; entry.text = target.value;
+    return;
+  }
+  if (state.logDraft && target.dataset.set !== undefined) {
+    state.logDraft.entries[Number(target.dataset.entry)].sets[Number(target.dataset.set)][target.dataset.field] = target.value;
     return;
   }
   if (target.dataset.bodyPart) {
@@ -401,7 +507,7 @@ app.addEventListener('error', event => {
   }
 }, true);
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && state.detail) { state.detail = null; render(); }
+  if (event.key === 'Escape' && (state.chart || state.detail)) { if (state.chart) state.chart = null; else state.detail = null; render(); }
 });
 window.addEventListener('pagehide', () => {
   if (!state.runner) return;
