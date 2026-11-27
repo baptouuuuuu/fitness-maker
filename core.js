@@ -1,6 +1,7 @@
 import { equipmentFilterFor } from './equipment-audit.js';
 
 export const STORAGE_KEY = 'fitness-maker-v1';
+export const MAX_SETS = 999;
 
 export const BODY_PART_FILTERS = [
   {id:'back', label:'Dos', categories:['Dos'], muscles:['Dos','Grand dorsal','Haut du dos','Trapèzes']},
@@ -92,7 +93,7 @@ export function recommend(exercises, session) {
 }
 
 export function validateItem(item) {
-  return item && (item.exerciseId === null || typeof item.exerciseId === 'string') && Number.isInteger(item.work) && item.work >= 5 && item.work <= 600 && Number.isInteger(item.rest) && item.rest >= 0 && item.rest <= 300 && Number.isInteger(item.sets) && item.sets >= 1 && item.sets <= 10 && (item.reps === undefined || (Number.isInteger(item.reps) && item.reps >= 0 && item.reps <= 999));
+  return item && (item.exerciseId === null || typeof item.exerciseId === 'string') && Number.isInteger(item.work) && item.work >= 5 && item.work <= 600 && Number.isInteger(item.rest) && item.rest >= 0 && item.rest <= 300 && Number.isInteger(item.sets) && item.sets >= 1 && item.sets <= MAX_SETS && (item.reps === undefined || (Number.isInteger(item.reps) && item.reps >= 0 && item.reps <= 999));
 }
 
 export function exportSession(session) {
